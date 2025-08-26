@@ -23,7 +23,7 @@ Puedes hacerlo a través de la interfaz de visual studio code o puedes hacer los
 
 1. Asegurate de tener todos los cambios de la rama principal en tu pc
 ```sh
-git checkout master
+git pull
 ```
 2. Añade los cambios (el . es para añadir todos los archivos)
  ```sh
