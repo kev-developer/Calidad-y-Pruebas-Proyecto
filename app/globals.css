@@ -4,39 +4,39 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0); /* #ffffff - Main background for the dashboard */
-  --foreground: oklch(0.205 0 0); /* #1f2937 - Primary text color */
-  --card: oklch(0.985 0 0); /* #f8fafc - Background for cards and modules */
-  --card-foreground: oklch(0.269 0 0); /* #374151 - Text color for card contents */
-  --popover: oklch(1 0 0); /* #ffffff - Background for popovers and tooltips */
-  --popover-foreground: oklch(0.269 0 0); /* #374151 - Text color for popovers */
-  --primary: oklch(0.269 0 0); /* #374151 - Color for primary buttons and actions */
-  --primary-foreground: oklch(1 0 0); /* #ffffff - Text color for primary buttons */
-  --secondary: oklch(0.488 0.243 264.376); /* #6366f1 - Color for secondary actions and highlights */
-  --secondary-foreground: oklch(1 0 0); /* #ffffff - Text color for secondary actions */
-  --muted: oklch(0.985 0 0); /* #f8fafc - Background for muted sections */
-  --muted-foreground: oklch(0.439 0 0); /* #4b5563 - Text color for muted sections */
-  --accent: oklch(0.488 0.243 264.376); /* #6366f1 - Accent color for highlights and links */
-  --accent-foreground: oklch(1 0 0); /* #ffffff - Text color for accent elements */
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.922 0 0); /* #e5e7eb - Border color for cards and sections */
-  --input: oklch(1 0 0); /* #ffffff - Background for input fields */
-  --ring: oklch(0.488 0.243 264.376); /* #6366f1 - Ring color for focused elements */
-  --chart-1: oklch(0.488 0.243 264.376); /* #4f46e5 - Color for first chart series */
-  --chart-2: oklch(0.6 0.118 184.704); /* #3b82f6 - Color for second chart series */
-  --chart-3: oklch(0.646 0.222 41.116); /* #22c55e - Color for third chart series */
-  --chart-4: oklch(0.828 0.189 84.429); /* #f59e0b - Color for fourth chart series */
-  --chart-5: oklch(0.769 0.188 70.08); /* #ef4444 - Color for fifth chart series */
-  --radius: 0.5rem; /* Corner radius for rounded elements */
-  --sidebar: oklch(0.985 0 0); /* #f8fafc - Background for sidebar */
-  --sidebar-foreground: oklch(0.269 0 0); /* #374151 - Text color for sidebar */
-  --sidebar-primary: oklch(1 0 0); /* #ffffff - Primary background for sidebar items */
-  --sidebar-primary-foreground: oklch(0.269 0 0); /* #374151 - Text color for primary sidebar items */
-  --sidebar-accent: oklch(0.488 0.243 264.376); /* #6366f1 - Accent color for sidebar highlights */
-  --sidebar-accent-foreground: oklch(1 0 0); /* #ffffff - Text color for sidebar accent items */
-  --sidebar-border: oklch(0.922 0 0); /* #e5e7eb - Border color for sidebar */
-  --sidebar-ring: oklch(0.488 0.243 264.376); /* #6366f1 - Ring color for focused sidebar items */
+  --background: oklch(1 0 0); /* Fondo principal */
+  --foreground: oklch(0.205 0 0); /* Texto principal */
+  --card: oklch(0.985 0 0); /* Fondo de tarjetas */
+  --card-foreground: oklch(0.269 0 0); /* Texto en tarjetas */
+  --popover: oklch(1 0 0); /* Fondo de popups */
+  --popover-foreground: oklch(0.269 0 0); /* Texto en popups */
+  --primary: oklch(0.269 0 0); /* Botones/acciones principales */
+  --primary-foreground: oklch(1 0 0); /* Texto en botones principales */
+  --secondary: oklch(0.488 0.243 264.376); /* Acciones secundarias */
+  --secondary-foreground: oklch(1 0 0); /* Texto en acciones secundarias */
+  --muted: oklch(0.985 0 0); /* Fondo suave/muted */
+  --muted-foreground: oklch(0.439 0 0); /* Texto en secciones suaves */
+  --accent: oklch(0.488 0.243 264.376); /* Color de acento */
+  --accent-foreground: oklch(1 0 0); /* Texto en elementos con acento */
+  --destructive: oklch(0.577 0.245 27.325); /* Acciones de peligro */
+  --destructive-foreground: oklch(1 0 0); /* Texto en acciones de peligro */
+  --border: oklch(0.922 0 0); /* Bordes */
+  --input: oklch(1 0 0); /* Fondo de inputs */
+  --ring: oklch(0.488 0.243 264.376); /* Resaltado al enfocar */
+  --chart-1: oklch(0.488 0.243 264.376); /* Serie 1 de gráficos */
+  --chart-2: oklch(0.6 0.118 184.704); /* Serie 2 de gráficos */
+  --chart-3: oklch(0.646 0.222 41.116); /* Serie 3 de gráficos */
+  --chart-4: oklch(0.828 0.189 84.429); /* Serie 4 de gráficos */
+  --chart-5: oklch(0.769 0.188 70.08); /* Serie 5 de gráficos */
+  --radius: 0.5rem; /* Bordes redondeados */
+  --sidebar: oklch(0.985 0 0); /* Fondo del sidebar */
+  --sidebar-foreground: oklch(0.269 0 0); /* Texto en sidebar */
+  --sidebar-primary: oklch(1 0 0); /* Fondo principal del sidebar */
+  --sidebar-primary-foreground: oklch(0.269 0 0); /* Texto en items principales */
+  --sidebar-accent: oklch(0.488 0.243 264.376); /* Acento en sidebar */
+  --sidebar-accent-foreground: oklch(1 0 0); /* Texto en acentos */
+  --sidebar-border: oklch(0.922 0 0); /* Borde del sidebar */
+  --sidebar-ring: oklch(0.488 0.243 264.376); /* Resaltado en sidebar */
   --font-open-sans: "Open Sans", sans-serif;
   --font-montserrat: "Montserrat", serif;
 }

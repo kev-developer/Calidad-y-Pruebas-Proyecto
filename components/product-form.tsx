@@ -20,24 +20,7 @@ interface ProductFormProps {
 }
 
 export function ProductForm({ product, onClose }: ProductFormProps) {
-  const [formData, setFormData] = useState<{
-    name: string,
-    description: string,
-    category: string,
-    brand: string,
-    author: string,
-    publisher: string,
-    sku: string,
-    costPrice: string,
-    salePrice: string,
-    stock: string,
-    minStock: string,
-    status: string,
-    isCombo: boolean,
-    comboProducts: { id: number; name: string; quantity: number; }[],
-    tags: string[],
-    
-  }>({
+  const [formData, setFormData] = useState({
     name: "",
     description: "",
     category: "",
@@ -52,7 +35,7 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
     status: "active",
     isCombo: false,
     comboProducts: [],
-    tags: [""],
+    tags: [],
   })
 
   const [newTag, setNewTag] = useState("")
