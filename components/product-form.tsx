@@ -34,7 +34,7 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
     minStock: string,
     status: string,
     isCombo: boolean,
-    comboProducts: string[],
+    comboProducts: { id: number; name: string; quantity: number; }[],
     tags: string[],
     
   }>({
