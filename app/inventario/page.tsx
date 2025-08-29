@@ -132,7 +132,7 @@ export default function InventoryPage() {
     return matchesSearch && matchesFilter
   })
 
-  const getStockStatusBadge = (status) => {
+  const getStockStatusBadge = (status:any) => {
     switch (status) {
       case "critical":
         return <Badge variant="destructive">Crítico</Badge>
@@ -145,7 +145,7 @@ export default function InventoryPage() {
     }
   }
 
-  const getAlertIcon = (priority) => {
+  const getAlertIcon = (priority:any) => {
     switch (priority) {
       case "high":
         return <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -373,7 +373,7 @@ export default function InventoryPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => {
-                                    setSelectedProduct(item)
+                                    setSelectedProduct(item as any)
                                     setIsAdjustmentFormOpen(true)
                                   }}
                                 >
@@ -383,7 +383,7 @@ export default function InventoryPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => {
-                                    setSelectedProduct(item)
+                                    setSelectedProduct(item as any)
                                     setIsAdjustmentFormOpen(true)
                                   }}
                                 >
