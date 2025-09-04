@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,13 +14,39 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement authentication logic
-    console.log("Login attempt:", { email, password })
-    // Redirect to dashboard after successful login
-    window.location.href = "/"
+    setError(null)
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || "Error al iniciar sesión")
+        return
+      }
+
+      // guardar token en localStorage (simple demo, luego se mejora con cookies seguras)
+      localStorage.setItem("token", data.token)
+
+      // redirección según rol
+      if (data.role === "cliente") {
+        router.push("/catalogo")
+      } else {
+        router.push("/dashboard") // la ruta principal de empleados/admin
+      }
+    } catch (err) {
+      setError("Ocurrió un error inesperado")
+    }
   }
 
   return (
@@ -74,6 +100,7 @@ export default function LoginPage() {
                 </Button>
               </div>
             </div>
+            {error && <p className="text-red-600 text-sm">{error}</p>}
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full">

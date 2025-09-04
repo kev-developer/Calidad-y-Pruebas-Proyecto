@@ -2,7 +2,9 @@ import { Header } from "@/components/header"
 import { Sidebar } from "@/components/sidebar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import { Package, Users, ShoppingCart, Truck, BarChart3, TrendingUp, AlertTriangle, DollarSign } from "lucide-react"
+
 
 export default function Dashboard() {
   return (
@@ -19,6 +21,13 @@ export default function Dashboard() {
             <div>
               <h2 className="text-3xl font-serif font-bold text-foreground">Dashboard Principal</h2>
               <p className="text-muted-foreground">Resumen general de tu papelería</p>
+
+              {/* Botón a Catálogo Público */}
+              <div className="mt-4">
+                <Button asChild variant="secondary">
+                  <Link href="/catalogo">Ver catálogo público</Link>
+                </Button>
+              </div>
             </div>
 
             {/* Stats Cards */}
@@ -147,6 +156,22 @@ export default function Dashboard() {
                   <Button className="w-full">Ver Análisis</Button>
                 </CardContent>
               </Card>
+
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5 text-accent" />
+                    Catálogo Público
+                  </CardTitle>
+                  <CardDescription>Landing catálogo</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button asChild className="w-full" variant="outline">
+                    <Link href="/catalogo">Ver Catálogo</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
             </div>
           </div>
         </main>

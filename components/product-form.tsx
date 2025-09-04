@@ -14,32 +14,60 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { X, Plus } from "lucide-react"
 
+interface ComboProduct {
+  id: number
+  name: string
+  quantity: number
+}
+
+interface ProductFormData {
+  name: string
+  description: string
+  category: string
+  brand: string
+  author: string
+  publisher: string
+  sku: string
+  costPrice: string
+  salePrice: string
+  stock: string
+  minStock: string
+  status: string
+  isCombo: boolean
+  comboProducts: ComboProduct[]
+  tags: string[]
+}
+
 interface ProductFormProps {
   product?: any
   onClose: () => void
 }
 
 export function ProductForm({ product, onClose }: ProductFormProps) {
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    category: "",
-    brand: "",
-    author: "",
-    publisher: "",
-    sku: "",
-    costPrice: "",
-    salePrice: "",
-    stock: "",
-    minStock: "",
-    status: "active",
-    isCombo: false,
-    comboProducts: [],
-    tags: [],
-  })
+    const [formData, setFormData] = useState<ProductFormData>({
+      name: "",
+      description: "",
+      category: "",
+      brand: "",
+      author: "",
+      publisher: "",
+      sku: "",
+      costPrice: "",
+      salePrice: "",
+      stock: "",
+      minStock: "",
+      status: "active",
+      isCombo: false,
+      comboProducts: [],
+      tags: [],
+    })
+
 
   const [newTag, setNewTag] = useState("")
-  const [comboProduct, setComboProduct] = useState({ productId: "", quantity: 1 })
+  const [comboProduct, setComboProduct] = useState<{ productId: string; quantity: number }>({
+    productId: "",
+    quantity: 1,
+  })
 
   const categories = ["Escolares", "Útiles", "Libros", "Arte", "Oficina", "Combos"]
   const mockProducts = [

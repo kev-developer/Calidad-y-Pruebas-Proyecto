@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,18 +19,43 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "cliente", // 🔑 por defecto cliente, puedes cambiarlo a empleado en otra UI
   })
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (formData.password !== formData.confirmPassword) {
       alert("Las contraseñas no coinciden")
       return
     }
-    // TODO: Implement registration logic
-    console.log("Register attempt:", formData)
-    // Redirect to login after successful registration
-    window.location.href = "/auth/login"
+
+    try {
+      setLoading(true)
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+        }),
+      })
+
+      if (res.ok) {
+        alert("Registro exitoso, ahora puedes iniciar sesión")
+        router.push("/auth/login")
+      } else {
+        const error = await res.json()
+        alert(error.message || "Error en el registro")
+      }
+    } catch (err) {
+      console.error("Error en registro:", err)
+      alert("Error en el servidor")
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -46,7 +72,7 @@ export default function RegisterPage() {
             </div>
           </div>
           <CardTitle className="text-2xl font-serif">Crear cuenta</CardTitle>
-          <CardDescription>Regístrate para acceder al sistema de gestión</CardDescription>
+          <CardDescription>Regístrate para acceder al sistema</CardDescription>
         </CardHeader>
         <form onSubmit={handleRegister}>
           <CardContent className="space-y-4">
@@ -126,8 +152,8 @@ export default function RegisterPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full">
-              Crear cuenta
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Registrando..." : "Crear cuenta"}
             </Button>
             <p className="text-sm text-center text-muted-foreground">
               ¿Ya tienes una cuenta?{" "}
