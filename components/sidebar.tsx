@@ -16,11 +16,6 @@ const navigation = [
     icon: BarChart3,
   },
   {
-    name: "Productos",
-    href: "/productos",
-    icon: Package,
-  },
-  {
     name: "Inventario",
     href: "/inventario",
     icon: Inventory,
