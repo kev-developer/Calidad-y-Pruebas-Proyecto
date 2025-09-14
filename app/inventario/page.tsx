@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Header } from "@/components/header"
 import { Sidebar } from "@/components/sidebar"
 import { Button } from "@/components/ui/button"
@@ -17,70 +17,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { AlertTriangle, Package, TrendingUp, Plus, Minus, Search, DollarSign } from "lucide-react"
+import { AlertTriangle, Package, TrendingUp, Plus, Minus, Search, DollarSign, Tag } from "lucide-react"
 import { StockAdjustmentForm } from "@/components/stock-adjustment-form"
 import { BulkPriceUpdateForm } from "@/components/bulk-price-update-form"
 import { InventoryMovements } from "@/components/inventory-movements"
-
-// Mock data for inventory
-const mockInventory = [
-  {
-    id: 1,
-    name: "Cuaderno Universitario 100 hojas",
-    sku: "CU-100-001",
-    category: "Escolares",
-    currentStock: 15,
-    minStock: 20,
-    maxStock: 200,
-    costPrice: 2.5,
-    salePrice: 4.0,
-    totalValue: 37.5,
-    lastMovement: "2024-01-15",
-    status: "low_stock",
-  },
-  {
-    id: 2,
-    name: "Bolígrafo BIC Azul",
-    sku: "BOL-BIC-001",
-    category: "Útiles",
-    currentStock: 300,
-    minStock: 50,
-    maxStock: 500,
-    costPrice: 0.8,
-    salePrice: 1.5,
-    totalValue: 240.0,
-    lastMovement: "2024-01-16",
-    status: "normal",
-  },
-  {
-    id: 3,
-    name: "Cien Años de Soledad",
-    sku: "LIB-CAS-001",
-    category: "Libros",
-    currentStock: 5,
-    minStock: 5,
-    maxStock: 50,
-    costPrice: 15.0,
-    salePrice: 25.0,
-    totalValue: 75.0,
-    lastMovement: "2024-01-14",
-    status: "critical",
-  },
-  {
-    id: 4,
-    name: "Kit Escolar Básico",
-    sku: "KIT-ESC-001",
-    category: "Combos",
-    currentStock: 45,
-    minStock: 10,
-    maxStock: 100,
-    costPrice: 12.0,
-    salePrice: 20.0,
-    totalValue: 540.0,
-    lastMovement: "2024-01-16",
-    status: "normal",
-  },
-]
+import { ProductoGet } from '@/lib/models'
+import { CategoryManager } from "@/components/category-manager"
+import { ProductForm } from "@/components/product-form"
 
 const mockAlerts = [
   {
@@ -110,38 +53,39 @@ const mockAlerts = [
 ]
 
 export default function InventoryPage() {
-  const [inventory, setInventory] = useState(mockInventory)
+  const [inventory, setInventory] = useState([])
   const [alerts, setAlerts] = useState(mockAlerts)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedFilter, setSelectedFilter] = useState("all")
   const [isAdjustmentFormOpen, setIsAdjustmentFormOpen] = useState(false)
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  const filteredInventory = inventory.filter((item) => {
+  const [isProductFormOpen, setIsProductFormOpen] = useState(false)
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState(null)
+
+  const filteredInventory = inventory.filter((item:ProductoGet) => {
     const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+      item.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.Id_producto.toString().toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesFilter =
       selectedFilter === "all" ||
-      (selectedFilter === "low_stock" && item.status === "low_stock") ||
-      (selectedFilter === "critical" && item.status === "critical") ||
-      (selectedFilter === "normal" && item.status === "normal")
+      (selectedFilter === "low_stock" && item.stock < 5) ||
+      (selectedFilter === "critical" && item.stock < 50) ||
+      (selectedFilter === "normal" && item.stock < 500)
 
     return matchesSearch && matchesFilter
   })
 
-  const getStockStatusBadge = (status:any) => {
-    switch (status) {
-      case "critical":
-        return <Badge variant="destructive">Crítico</Badge>
-      case "low_stock":
-        return <Badge variant="secondary">Stock Bajo</Badge>
-      case "normal":
-        return <Badge variant="default">Normal</Badge>
-      default:
-        return <Badge variant="outline">Desconocido</Badge>
+  const getStockStatusBadge = (activo:boolean) => {
+    if(activo){
+      return <Badge variant="default">Normal</Badge>
+    }else{
+
+      return <Badge variant="destructive">Crítico</Badge>
     }
   }
 
@@ -158,9 +102,24 @@ export default function InventoryPage() {
     }
   }
 
-  const totalInventoryValue = inventory.reduce((sum, item) => sum + item.totalValue, 0)
-  const lowStockItems = inventory.filter((item) => item.status === "low_stock" || item.status === "critical").length
+  const totalInventoryValue = inventory.reduce((sum, item:ProductoGet) => sum + item.precio, 0)
+  const lowStockItems = inventory.filter((item:ProductoGet) => item.stock < 5 || item.stock < 50).length
   const totalProducts = inventory.length
+
+  useEffect(() => {
+    let mounted=true;
+    fetch("http://localhost:8000/productos/")
+      .then((r) => r.json())
+      .then((data) => {
+        setInventory(data)
+      })
+      .catch(console.error)
+      .finally(() => mounted && setLoading(false))
+    return () => {
+      mounted = false
+    }
+  }, [])
+  
 
   return (
     <div className="flex h-screen bg-background">
@@ -177,6 +136,47 @@ export default function InventoryPage() {
               <div>
                 <h2 className="text-3xl font-serif font-bold text-foreground">Control de Inventario</h2>
                 <p className="text-muted-foreground">Gestiona el stock y movimientos de inventario</p>
+              </div>
+              <div className="flex gap-2">
+                <Dialog open={isCategoryManagerOpen} onOpenChange={setIsCategoryManagerOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Tag className="h-4 w-4 mr-2" />
+                      Categorías
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Gestión de Categorías</DialogTitle>
+                      <DialogDescription>Administra las categorías de productos</DialogDescription>
+                    </DialogHeader>
+                    <CategoryManager />
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isProductFormOpen} onOpenChange={setIsProductFormOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nuevo Producto
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
+                      <DialogDescription>
+                        {editingProduct ? "Modifica los datos del producto" : "Agrega un nuevo producto al catálogo"}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ProductForm
+                      product={editingProduct}
+                      onClose={() => {
+                        setIsProductFormOpen(false)
+                        setEditingProduct(null)
+                      }}
+                    />
+                  </DialogContent>
+                </Dialog>
               </div>
               <div className="flex gap-2">
                 <Dialog open={isBulkUpdateOpen} onOpenChange={setIsBulkUpdateOpen}>
@@ -344,29 +344,29 @@ export default function InventoryPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredInventory.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell>{item.sku}</TableCell>
+                        {filteredInventory.map((item:ProductoGet) => (
+                          <TableRow key={item.Id_producto}>
+                            <TableCell className="font-medium">{item.nombre}</TableCell>
+                            <TableCell>{item.Id_producto}</TableCell>
                             <TableCell>
-                              <Badge variant="outline">{item.category}</Badge>
+                              <Badge variant="outline">{item.id_marca}</Badge>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold">{item.currentStock}</span>
-                                {item.currentStock <= item.minStock && (
+                                <span className="font-semibold">{item.stock}</span>
+                                {item.stock <= 50 && (
                                   <AlertTriangle className="h-4 w-4 text-destructive" />
                                 )}
                               </div>
                             </TableCell>
                             <TableCell>
                               <span className="text-sm text-muted-foreground">
-                                {item.minStock} / {item.maxStock}
+                                {item.stock} / {item.stock * 23}
                               </span>
                             </TableCell>
-                            <TableCell>${item.costPrice.toFixed(2)}</TableCell>
-                            <TableCell>${item.totalValue.toFixed(2)}</TableCell>
-                            <TableCell>{getStockStatusBadge(item.status)}</TableCell>
+                            <TableCell>${item.precio.toFixed(2)}</TableCell>
+                            <TableCell>${item.precio.toFixed(4)}</TableCell>
+                            <TableCell>{getStockStatusBadge(item.activo)}</TableCell>
                             <TableCell>
                               <div className="flex gap-1">
                                 <Button
