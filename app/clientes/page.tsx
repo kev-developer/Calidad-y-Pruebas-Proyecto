@@ -1,580 +1,523 @@
 "use client"
 
-import { useState } from "react"
-import { Header } from "@/components/header"
-import { Sidebar } from "@/components/sidebar"
+import type React from "react"
+
+import { useEffect, useState } from "react"
+import { DashboardLayout } from "@/components/ui/dashboard-layout"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Users, Star, Gift, Eye } from "lucide-react"
-import { CustomerForm } from "@/components/customer-form"
-import { CustomerDetails } from "@/components/customer-details"
-import { LoyaltyProgram } from "@/components/loyalty-program"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Search, Users, Star, Edit, Trash2, Mail, CreditCard } from "lucide-react"
+import type { Cliente, ApiResponse } from "@/lib/models"
+import { clientesService } from "@/lib/services/clientes"
+import { useToast } from "@/components/ui/use-toast"
 
-// Mock data for customers
-const mockCustomers = [
-  {
-    id: 1,
-    name: "María González",
-    email: "maria.gonzalez@email.com",
-    phone: "+57 300 123 4567",
-    document: "12345678",
-    documentType: "CC",
-    type: "retail",
-    address: "Calle 123 #45-67, Bogotá",
-    registrationDate: "2023-06-15",
-    lastPurchase: "2024-01-15",
-    totalPurchases: 15,
-    totalSpent: 450.75,
-    loyaltyPoints: 225,
-    discount: 0,
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "Colegio San José",
-    email: "compras@colegiosanjose.edu.co",
-    phone: "+57 301 987 6543",
-    document: "900123456-1",
-    documentType: "NIT",
-    type: "institutional",
-    address: "Carrera 50 #30-20, Medellín",
-    registrationDate: "2023-03-10",
-    lastPurchase: "2024-01-14",
-    totalPurchases: 8,
-    totalSpent: 2850.0,
-    loyaltyPoints: 0,
-    discount: 15,
-    status: "active",
-  },
-  {
-    id: 3,
-    name: "Carlos Rodríguez",
-    email: "carlos.rodriguez@papeleria.com",
-    phone: "+57 302 456 7890",
-    document: "87654321",
-    documentType: "CC",
-    type: "wholesale",
-    address: "Avenida 80 #25-30, Cali",
-    registrationDate: "2023-08-22",
-    lastPurchase: "2024-01-16",
-    totalPurchases: 25,
-    totalSpent: 1250.5,
-    loyaltyPoints: 625,
-    discount: 10,
-    status: "active",
-  },
-  {
-    id: 4,
-    name: "Ana Martínez",
-    email: "ana.martinez@gmail.com",
-    phone: "+57 303 789 0123",
-    document: "11223344",
-    documentType: "CC",
-    type: "retail",
-    address: "Calle 45 #12-34, Barranquilla",
-    registrationDate: "2023-11-05",
-    lastPurchase: "2024-01-10",
-    totalPurchases: 3,
-    totalSpent: 89.25,
-    loyaltyPoints: 44,
-    discount: 0,
-    status: "inactive",
-  },
-]
-
-export default function CustomersPage() {
-  const [customers, setCustomers] = useState(mockCustomers)
+export default function ClientesPage() {
+  const [clientes, setClientes] = useState<Cliente[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedType, setSelectedType] = useState("all")
-  const [selectedStatus, setSelectedStatus] = useState("all")
-  const [isCustomerFormOpen, setIsCustomerFormOpen] = useState(false)
-  const [isLoyaltyProgramOpen, setIsLoyaltyProgramOpen] = useState(false)
-  const [editingCustomer, setEditingCustomer] = useState(null)
-  const [viewingCustomer, setViewingCustomer] = useState(null)
+  const [filterType, setFilterType] = useState<string>("all")
+  const { toast } = useToast()
 
-  const customerTypes = ["all", "retail", "wholesale", "institutional"]
-  const customerStatuses = ["all", "active", "inactive"]
+  // Dialog states
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingClient, setEditingClient] = useState<Cliente | null>(null)
 
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch =
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.document.includes(searchTerm)
-
-    const matchesType = selectedType === "all" || customer.type === selectedType
-    const matchesStatus = selectedStatus === "all" || customer.status === selectedStatus
-
-    return matchesSearch && matchesType && matchesStatus
+  // Form states
+  const [formData, setFormData] = useState({
+    nombre: "",
+    dni: "",
+    tipoCliente: "Minorista" as "Minorista" | "Mayorista" | "Institucional",
+    email: "",
+    puntos: 0,
+    idPrograma: null as number | null,
   })
 
-  const handleEditCustomer = (customer) => {
-    setEditingCustomer(customer)
-    setIsCustomerFormOpen(true)
-  }
+  useEffect(() => {
+    fetchClientes()
+  }, [])
 
-  const handleViewCustomer = (customer) => {
-    setViewingCustomer(customer)
-  }
-
-  const handleDeleteCustomer = (customerId) => {
-    setCustomers(customers.filter((c) => c.id !== customerId))
-  }
-
-  const getCustomerTypeBadge = (type) => {
-    switch (type) {
-      case "retail":
-        return <Badge variant="default">Minorista</Badge>
-      case "wholesale":
-        return <Badge variant="secondary">Mayorista</Badge>
-      case "institutional":
-        return <Badge variant="outline">Institucional</Badge>
-      default:
-        return <Badge variant="outline">Desconocido</Badge>
+  const fetchClientes = async () => {
+    try {
+      const data = await clientesService.getClientes()
+      
+      if (data.success && data.data) {
+        setClientes(data.data)
+        
+      } else {
+        console.error("Error :", data.message)
+      }
+    } catch (error) {
+      console.error("Error al hacer fetching clientes:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const getStatusBadge = (status) => {
-    return status === "active" ? <Badge variant="default">Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>
+  const filteredClientes = clientes.filter((cliente) => {
+    const matchesSearch =
+      cliente.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.dni?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      false
+
+    const matchesType = filterType === "all" || cliente.tipoCliente === filterType
+
+    return matchesSearch && matchesType
+  })
+
+  
+
+  const getClientTypeColor = (tipo: string) => {
+    switch (tipo) {
+      case "Mayorista":
+        return "default"
+      case "Institucional":
+        return "secondary"
+      default:
+        return "outline"
+    }
   }
 
-  const totalCustomers = customers.length
-  const activeCustomers = customers.filter((c) => c.status === "active").length
-  const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0)
-  const averageSpent = totalRevenue / totalCustomers
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      let data: ApiResponse<Cliente>
+      if (editingClient) {
+        data = await clientesService.updateCliente(editingClient.idCliente, formData)
+      } else {
+        data = await clientesService.createCliente(formData)
+      }
+
+      if (data.success) {
+        toast({
+          title: editingClient ? "Cliente actualizado" : "Cliente creado",
+          description: editingClient ? "El cliente ha sido actualizado correctamente." : "El cliente ha sido creado correctamente.",
+          variant: "default",
+        })
+        await fetchClientes()
+        setIsAddDialogOpen(false)
+        setIsEditDialogOpen(false)
+        resetForm()
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Ha ocurrido un error al guardar el cliente.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving cliente:", error)
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error inesperado al guardar el cliente.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    if (confirm("¿Estás seguro de que deseas eliminar este cliente?")) {
+      try {
+        const data = await clientesService.deleteCliente(id)
+
+        if (data.success) {
+          toast({
+            title: "Cliente eliminado",
+            description: "El cliente ha sido eliminado correctamente.",
+            variant: "default",
+          })
+          await fetchClientes()
+        } else {
+          toast({
+            title: "Error",
+            description: data.message || "Ha ocurrido un error al eliminar el cliente.",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error deleting cliente:", error)
+        toast({
+          title: "Error",
+          description: "Ha ocurrido un error inesperado al eliminar el cliente.",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      nombre: "",
+      dni: "",
+      tipoCliente: "Minorista",
+      email: "",
+      puntos: 0,
+      idPrograma: null,
+    })
+    setEditingClient(null)
+  }
+
+  const handleEdit = (cliente: Cliente) => {
+    setEditingClient(cliente)
+    setFormData({
+      nombre: cliente.nombre || "",
+      dni: cliente.dni || "",
+      tipoCliente: cliente.tipoCliente,
+      email: cliente.email || "",
+      puntos: cliente.puntos,
+      idPrograma: cliente.idPrograma,
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-2 text-muted-foreground">Cargando clientes...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  const totalClientes = clientes.length
+  const clientesMinoristas = clientes.filter((c) => c.tipoCliente === "Minorista").length
+  const clientesMayoristas = clientes.filter((c) => c.tipoCliente === "Mayorista").length
+  const clientesInstitucionales = clientes.filter((c) => c.tipoCliente === "Institucional").length
+
+
 
   return (
-    <div className="flex h-screen bg-background">
-      <div className="hidden md:block">
-        <Sidebar />
-      </div>
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-serif font-bold text-foreground">Gestión de Clientes</h2>
-                <p className="text-muted-foreground">Administra tu base de clientes y programas de fidelización</p>
-              </div>
-              <div className="flex gap-2">
-                <Dialog open={isLoyaltyProgramOpen} onOpenChange={setIsLoyaltyProgramOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Gift className="h-4 w-4 mr-2" />
-                      Programa de Fidelización
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Programa de Fidelización</DialogTitle>
-                      <DialogDescription>Gestiona puntos y recompensas para clientes</DialogDescription>
-                    </DialogHeader>
-                    <LoyaltyProgram />
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={isCustomerFormOpen} onOpenChange={setIsCustomerFormOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Nuevo Cliente
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>{editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}</DialogTitle>
-                      <DialogDescription>
-                        {editingCustomer ? "Modifica los datos del cliente" : "Registra un nuevo cliente"}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <CustomerForm
-                      customer={editingCustomer}
-                      onClose={() => {
-                        setIsCustomerFormOpen(false)
-                        setEditingCustomer(null)
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Clientes</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{totalCustomers}</div>
-                  <p className="text-xs text-muted-foreground">{activeCustomers} activos</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-                  <Star className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">De todos los clientes</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Gasto Promedio</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${averageSpent.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Por cliente</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Puntos Activos</CardTitle>
-                  <Gift className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {customers.reduce((sum, c) => sum + c.loyaltyPoints, 0).toLocaleString()}
-                  </div>
-                  <p className="text-xs text-muted-foreground">En programa de fidelización</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Tabs defaultValue="customers" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="customers">Clientes</TabsTrigger>
-                <TabsTrigger value="segments">Segmentos</TabsTrigger>
-                <TabsTrigger value="analytics">Análisis</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="customers" className="space-y-4">
-                {/* Filters */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Filtros</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-4 items-center">
-                      <div className="flex-1">
-                        <div className="relative">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Buscar clientes..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-8"
-                          />
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline">
-                            <Filter className="h-4 w-4 mr-2" />
-                            Tipo: {selectedType === "all" ? "Todos" : selectedType}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => setSelectedType("all")}>Todos los tipos</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => setSelectedType("retail")}>Minorista</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setSelectedType("wholesale")}>Mayorista</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setSelectedType("institutional")}>
-                            Institucional
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline">
-                            <Filter className="h-4 w-4 mr-2" />
-                            Estado: {selectedStatus === "all" ? "Todos" : selectedStatus}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => setSelectedStatus("all")}>
-                            Todos los estados
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => setSelectedStatus("active")}>Activos</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setSelectedStatus("inactive")}>Inactivos</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Customers Table */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Lista de Clientes</CardTitle>
-                    <CardDescription>{filteredCustomers.length} clientes encontrados</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Cliente</TableHead>
-                          <TableHead>Documento</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Contacto</TableHead>
-                          <TableHead>Compras</TableHead>
-                          <TableHead>Total Gastado</TableHead>
-                          <TableHead>Puntos</TableHead>
-                          <TableHead>Descuento</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredCustomers.map((customer) => (
-                          <TableRow key={customer.id}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{customer.name}</div>
-                                <div className="text-sm text-muted-foreground">{customer.email}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <div>
-                                  {customer.documentType}: {customer.document}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>{getCustomerTypeBadge(customer.type)}</TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <div>{customer.phone}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-center">
-                                <div className="font-semibold">{customer.totalPurchases}</div>
-                                <div className="text-xs text-muted-foreground">compras</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-semibold">${customer.totalSpent.toFixed(2)}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Star className="h-3 w-3 text-yellow-500" />
-                                <span className="font-medium">{customer.loyaltyPoints}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {customer.discount > 0 ? (
-                                <Badge variant="secondary">{customer.discount}%</Badge>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell>{getStatusBadge(customer.status)}</TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" className="h-8 w-8 p-0">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                  <DropdownMenuItem onClick={() => handleViewCustomer(customer)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Ver Detalles
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => handleDeleteCustomer(customer.id)}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Eliminar
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="segments" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-3">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Clientes Minoristas</CardTitle>
-                      <CardDescription>Clientes individuales</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{customers.filter((c) => c.type === "retail").length}</div>
-                      <p className="text-xs text-muted-foreground">
-                        $
-                        {customers
-                          .filter((c) => c.type === "retail")
-                          .reduce((sum, c) => sum + c.totalSpent, 0)
-                          .toFixed(2)}{" "}
-                        en ventas
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Clientes Mayoristas</CardTitle>
-                      <CardDescription>Revendedores</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{customers.filter((c) => c.type === "wholesale").length}</div>
-                      <p className="text-xs text-muted-foreground">
-                        $
-                        {customers
-                          .filter((c) => c.type === "wholesale")
-                          .reduce((sum, c) => sum + c.totalSpent, 0)
-                          .toFixed(2)}{" "}
-                        en ventas
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Clientes Institucionales</CardTitle>
-                      <CardDescription>Colegios y empresas</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {customers.filter((c) => c.type === "institutional").length}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        $
-                        {customers
-                          .filter((c) => c.type === "institutional")
-                          .reduce((sum, c) => sum + c.totalSpent, 0)
-                          .toFixed(2)}{" "}
-                        en ventas
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="analytics" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Top 5 Clientes</CardTitle>
-                      <CardDescription>Por valor de compras</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {customers
-                          .sort((a, b) => b.totalSpent - a.totalSpent)
-                          .slice(0, 5)
-                          .map((customer, index) => (
-                            <div key={customer.id} className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="w-6 h-6 rounded-full bg-accent text-accent-foreground text-xs flex items-center justify-center">
-                                  {index + 1}
-                                </div>
-                                <div>
-                                  <div className="font-medium">{customer.name}</div>
-                                  <div className="text-sm text-muted-foreground">{customer.totalPurchases} compras</div>
-                                </div>
-                              </div>
-                              <div className="font-semibold">${customer.totalSpent.toFixed(2)}</div>
-                            </div>
-                          ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Distribución por Tipo</CardTitle>
-                      <CardDescription>Porcentaje de clientes por segmento</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {["retail", "wholesale", "institutional"].map((type) => {
-                          const count = customers.filter((c) => c.type === type).length
-                          const percentage = ((count / totalCustomers) * 100).toFixed(1)
-                          const typeName =
-                            type === "retail" ? "Minorista" : type === "wholesale" ? "Mayorista" : "Institucional"
-
-                          return (
-                            <div key={type} className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span>{typeName}</span>
-                                <span>
-                                  {count} ({percentage}%)
-                                </span>
-                              </div>
-                              <div className="w-full bg-secondary rounded-full h-2">
-                                <div className="bg-accent h-2 rounded-full" style={{ width: `${percentage}%` }}></div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-            </Tabs>
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-balance">Gestión de Clientes</h2>
+            <p className="text-muted-foreground">Administra tu base de clientes</p>
           </div>
-        </main>
-      </div>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Cliente
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Agregar Nuevo Cliente</DialogTitle>
+                <DialogDescription>Registra un nuevo cliente en el sistema.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit}>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="nombre">Nombre</Label>
+                    <Input
+                      id="nombre"
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      placeholder="Nombre completo del cliente"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="dni">DNI/RUC</Label>
+                    <Input
+                      id="dni"
+                      value={formData.dni}
+                      onChange={(e) => setFormData({ ...formData, dni: e.target.value })}
+                      placeholder="Documento de identidad"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="tipoCliente">Tipo de Cliente</Label>
+                    <Select
+                      value={formData.tipoCliente}
+                      onValueChange={(value: "Minorista" | "Mayorista" | "Institucional") =>
+                        setFormData({ ...formData, tipoCliente: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Minorista">Minorista</SelectItem>
+                        <SelectItem value="Mayorista">Mayorista</SelectItem>
+                        <SelectItem value="Institucional">Institucional</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="correo@ejemplo.com"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit">Agregar Cliente</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-      {/* Customer Details Dialog */}
-      {viewingCustomer && (
-        <Dialog open={!!viewingCustomer} onOpenChange={() => setViewingCustomer(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        {/* Stats Cards */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Clientes</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalClientes}</div>
+              <p className="text-xs text-muted-foreground">Clientes registrados</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Minoristas</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{clientesMinoristas}</div>
+              <p className="text-xs text-muted-foreground">Clientes minoristas</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Mayoristas</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{clientesMayoristas}</div>
+              <p className="text-xs text-muted-foreground">Clientes mayoristas</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Institucionales</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{clientesInstitucionales}</div>
+              <p className="text-xs text-muted-foreground">Clientes institucionales</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Filtros</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nombre, DNI o email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Tipo de cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="Minorista">Minorista</SelectItem>
+                  <SelectItem value="Mayorista">Mayorista</SelectItem>
+                  <SelectItem value="Institucional">Institucional</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Clients Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Lista de Clientes</CardTitle>
+            <CardDescription>Todos los clientes registrados en el sistema</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>DNI/RUC</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Contacto</TableHead>
+                  <TableHead>Puntos</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredClientes.length > 0 ? (
+                  filteredClientes.map((cliente) => {
+                    
+                    return (
+                      <TableRow key={cliente.idCliente}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                              <Users className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{cliente.nombre || "Sin nombre"}</p>
+                              <p className="text-sm text-muted-foreground">ID: {cliente.idCliente}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4 text-muted-foreground" />
+                            {cliente.dni || "No registrado"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getClientTypeColor(cliente.tipoCliente)}>{cliente.tipoCliente}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {cliente.email && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Mail className="h-3 w-3 text-muted-foreground" />
+                                {cliente.email}
+                              </div>
+                            )}
+                            {!cliente.email && <span className="text-sm text-muted-foreground">Sin email</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Star className="h-4 w-4 text-yellow-500" />
+                            <span className="font-medium">{cliente.puntos}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(cliente)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete(cliente.idCliente)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-4">
+                      {clientes.length === 0 ? "No hay clientes registrados" : "No se encontraron clientes con los filtros aplicados"}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Detalles del Cliente</DialogTitle>
-              <DialogDescription>Información completa y historial de compras</DialogDescription>
+              <DialogTitle>Editar Cliente</DialogTitle>
+              <DialogDescription>Actualiza la información del cliente.</DialogDescription>
             </DialogHeader>
-            <CustomerDetails customer={viewingCustomer} onClose={() => setViewingCustomer(null)} />
+            <form onSubmit={handleSubmit}>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-nombre">Nombre</Label>
+                  <Input
+                    id="edit-nombre"
+                    value={formData.nombre}
+                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                    placeholder="Nombre completo del cliente"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-dni">DNI/RUC</Label>
+                  <Input
+                    id="edit-dni"
+                    value={formData.dni}
+                    onChange={(e) => setFormData({ ...formData, dni: e.target.value })}
+                    placeholder="Documento de identidad"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-tipoCliente">Tipo de Cliente</Label>
+                  <Select
+                    value={formData.tipoCliente}
+                    onValueChange={(value: "Minorista" | "Mayorista" | "Institucional") =>
+                      setFormData({ ...formData, tipoCliente: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Minorista">Minorista</SelectItem>
+                      <SelectItem value="Mayorista">Mayorista</SelectItem>
+                      <SelectItem value="Institucional">Institucional</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="correo@ejemplo.com"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Actualizar Cliente</Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
-      )}
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

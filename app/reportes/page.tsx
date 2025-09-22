@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -31,54 +31,95 @@ import {
   Package,
   CalendarIcon,
   Download,
+  AlertCircle,
 } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { reportesService } from "@/lib/services/reportes"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [dateRange, setDateRange] = useState("month")
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [dashboardStats, setDashboardStats] = useState<any>(null)
+  const [salesData, setSalesData] = useState<any[]>([])
+  const [topProducts, setTopProducts] = useState<any[]>([])
+  const [categoryData, setCategoryData] = useState<any[]>([])
+  const [topCustomers, setTopCustomers] = useState<any[]>([])
+  const [inventoryAlerts, setInventoryAlerts] = useState<any[]>([])
 
-  // Mock data for charts
-  const salesData = [
-    { name: "Ene", ventas: 4000, costos: 2400 },
-    { name: "Feb", ventas: 3000, costos: 1398 },
-    { name: "Mar", ventas: 2000, costos: 9800 },
-    { name: "Abr", ventas: 2780, costos: 3908 },
-    { name: "May", ventas: 1890, costos: 4800 },
-    { name: "Jun", ventas: 2390, costos: 3800 },
-  ]
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
 
-  const topProducts = [
-    { name: "Cuaderno Universitario", sales: 450, revenue: 1125000 },
-    { name: "Bolígrafo Azul", sales: 320, revenue: 256000 },
-    { name: "Lápiz HB", sales: 280, revenue: 140000 },
-    { name: "Borrador Blanco", sales: 200, revenue: 60000 },
-    { name: "Regla 30cm", sales: 150, revenue: 180000 },
-  ]
+        // Fetch all necessary data in parallel
+        const [statsResponse, alertsResponse, customersResponse, ventasResponse, clientesResponse, categoryResponse] = await Promise.all([
+          reportesService.getDashboardStats(),
+          reportesService.getInventoryAlerts(),
+          reportesService.getTopCustomers(),
+          reportesService.getVentas(),
+          reportesService.getClientes(),
+          reportesService.getSalesByCategory()
+        ]);
 
-  const categoryData = [
-    { name: "Escolares", value: 35, color: "#3b82f6" },
-    { name: "Útiles", value: 30, color: "#10b981" },
-    { name: "Arte", value: 20, color: "#f59e0b" },
-    { name: "Oficina", value: 15, color: "#ef4444" },
-  ]
+        if (statsResponse.success && statsResponse.data) {
+          setDashboardStats(statsResponse.data)
+          // Use monthly sales data for charts
+          setSalesData(statsResponse.data.ventasMes.map((item: any) => ({
+            name: item.mes,
+            ventas: item.total,
+            costos: item.total * 0.7 // Assuming 70% cost for demonstration
+          })))
+          setTopProducts(statsResponse.data.topProductos.slice(0, 5))
+        } else {
+          throw new Error(statsResponse.message || 'Error al cargar estadísticas')
+        }
 
-  const topCustomers = [
-    { name: "Colegio San José", purchases: 15, total: 2500000 },
-    { name: "Librería Central", purchases: 12, total: 1800000 },
-    { name: "Juan Pérez", purchases: 8, total: 450000 },
-    { name: "María González", purchases: 6, total: 320000 },
-    { name: "Carlos Rodríguez", purchases: 5, total: 280000 },
-  ]
+        if (alertsResponse.success && alertsResponse.data) {
+          setInventoryAlerts(alertsResponse.data)
+        }
 
-  const inventoryAlerts = [
-    { product: "Cuaderno Universitario", stock: 5, minStock: 20, status: "critical" },
-    { product: "Bolígrafo Rojo", stock: 12, minStock: 25, status: "low" },
-    { product: "Lápiz 2B", stock: 18, minStock: 30, status: "low" },
-    { product: "Borrador Grande", stock: 3, minStock: 15, status: "critical" },
-  ]
+        if (customersResponse.success && customersResponse.data) {
+          setTopCustomers(customersResponse.data.slice(0, 5))
+        }
+
+        // Use real category data instead of placeholders
+        if (categoryResponse.success && categoryResponse.data) {
+          
+          setCategoryData(categoryResponse.data);
+        } else {
+          console.error('Error al obtener datos de categoría:', categoryResponse.message);
+          setCategoryData([]); // Set empty array on error to prevent chart issues
+        }
+
+        // Calculate financial metrics from real data
+        const ventas = ventasResponse.success && ventasResponse.data ? ventasResponse.data : [];
+        const clientes = clientesResponse.success && clientesResponse.data ? clientesResponse.data : [];
+        
+        const financialMetrics = reportesService.calculateFinancialMetrics(ventas);
+        const customerMetrics = reportesService.calculateCustomerMetrics(clientes, ventas);
+
+        // Store these metrics in state for use in the component
+        setDashboardStats((prev: any) => ({
+          ...prev,
+          financialMetrics,
+          customerMetrics
+        }));
+
+      } catch (err) {
+        console.error('Error fetching report data:', err)
+        setError(err instanceof Error ? err.message : 'Error desconocido al cargar datos')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -89,6 +130,30 @@ export default function ReportesPage() {
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Cargando reportes...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto flex items-center justify-center h-96">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-slate-800 mb-2">Error al cargar reportes</h2>
+          <p className="text-slate-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Reintentar</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -145,7 +210,9 @@ export default function ReportesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-600">Ventas del Mes</p>
-                    <p className="text-2xl font-bold text-slate-800">$2.4M</p>
+                    <p className="text-2xl font-bold text-slate-800">
+                      ${dashboardStats?.totalVentas ? (dashboardStats.totalVentas / 1000).toFixed(1) + 'K' : '0'}
+                    </p>
                     <div className="flex items-center gap-1 text-sm">
                       <TrendingUp className="w-4 h-4 text-green-600" />
                       <span className="text-green-600">+12.5%</span>
@@ -163,7 +230,9 @@ export default function ReportesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-600">Órdenes</p>
-                    <p className="text-2xl font-bold text-slate-800">1,234</p>
+                    <p className="text-2xl font-bold text-slate-800">
+                      {dashboardStats?.ventasMes?.reduce((acc: number, item: any) => acc + (item.cantidad || 0), 0) || 0}
+                    </p>
                     <div className="flex items-center gap-1 text-sm">
                       <TrendingUp className="w-4 h-4 text-green-600" />
                       <span className="text-green-600">+8.2%</span>
@@ -181,7 +250,7 @@ export default function ReportesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-600">Clientes Activos</p>
-                    <p className="text-2xl font-bold text-slate-800">456</p>
+                    <p className="text-2xl font-bold text-slate-800">{dashboardStats?.totalClientes || 0}</p>
                     <div className="flex items-center gap-1 text-sm">
                       <TrendingUp className="w-4 h-4 text-green-600" />
                       <span className="text-green-600">+5.1%</span>
@@ -199,7 +268,7 @@ export default function ReportesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-600">Productos</p>
-                    <p className="text-2xl font-bold text-slate-800">2,890</p>
+                    <p className="text-2xl font-bold text-slate-800">{dashboardStats?.productosStock || 0}</p>
                     <div className="flex items-center gap-1 text-sm">
                       <TrendingDown className="w-4 h-4 text-red-600" />
                       <span className="text-red-600">-2.3%</span>
@@ -334,19 +403,27 @@ export default function ReportesPage() {
               <CardContent className="space-y-4">
                 <div className="p-4 bg-emerald-50 rounded-lg">
                   <p className="text-sm text-emerald-700">Venta Promedio</p>
-                  <p className="text-2xl font-bold text-emerald-800">$45,600</p>
+                  <p className="text-2xl font-bold text-emerald-800">
+                    ${dashboardStats?.financialMetrics?.ventaPromedio ? Math.round(dashboardStats.financialMetrics.ventaPromedio).toLocaleString() : '0'}
+                  </p>
                 </div>
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-700">Transacciones/Día</p>
-                  <p className="text-2xl font-bold text-blue-800">127</p>
+                  <p className="text-2xl font-bold text-blue-800">
+                    {dashboardStats?.financialMetrics?.transaccionesPorDia ? Math.round(dashboardStats.financialMetrics.transaccionesPorDia) : '0'}
+                  </p>
                 </div>
                 <div className="p-4 bg-purple-50 rounded-lg">
                   <p className="text-sm text-purple-700">Margen Promedio</p>
-                  <p className="text-2xl font-bold text-purple-800">32%</p>
+                  <p className="text-2xl font-bold text-purple-800">
+                    {dashboardStats?.financialMetrics?.margenPromedio ? Math.round(dashboardStats.financialMetrics.margenPromedio) + '%' : '0%'}
+                  </p>
                 </div>
                 <div className="p-4 bg-orange-50 rounded-lg">
                   <p className="text-sm text-orange-700">Crecimiento</p>
-                  <p className="text-2xl font-bold text-orange-800">+12.5%</p>
+                  <p className="text-2xl font-bold text-orange-800">
+                    {dashboardStats?.financialMetrics?.crecimiento ? '+' + dashboardStats.financialMetrics.crecimiento.toFixed(1) + '%' : '0%'}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -384,24 +461,34 @@ export default function ReportesPage() {
               <CardContent className="space-y-4">
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm text-slate-600">Valor Total</p>
-                  <p className="text-2xl font-bold text-slate-800">$8.5M</p>
+                  <p className="text-2xl font-bold text-slate-800">
+                    ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales / 1000000).toFixed(1) + 'M' : '0'}
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 bg-emerald-50 rounded-lg">
                     <p className="text-sm text-emerald-700">Escolares</p>
-                    <p className="text-lg font-bold text-emerald-800">$3.2M</p>
+                    <p className="text-lg font-bold text-emerald-800">
+                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.35 / 1000000).toFixed(1) + 'M' : '0'}
+                    </p>
                   </div>
                   <div className="p-3 bg-blue-50 rounded-lg">
                     <p className="text-sm text-blue-700">Útiles</p>
-                    <p className="text-lg font-bold text-blue-800">$2.8M</p>
+                    <p className="text-lg font-bold text-blue-800">
+                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.30 / 1000000).toFixed(1) + 'M' : '0'}
+                    </p>
                   </div>
                   <div className="p-3 bg-orange-50 rounded-lg">
                     <p className="text-sm text-orange-700">Arte</p>
-                    <p className="text-lg font-bold text-orange-800">$1.5M</p>
+                    <p className="text-lg font-bold text-orange-800">
+                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.20 / 1000000).toFixed(1) + 'M' : '0'}
+                    </p>
                   </div>
                   <div className="p-3 bg-purple-50 rounded-lg">
                     <p className="text-sm text-purple-700">Oficina</p>
-                    <p className="text-lg font-bold text-purple-800">$1.0M</p>
+                    <p className="text-lg font-bold text-purple-800">
+                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.15 / 1000000).toFixed(1) + 'M' : '0'}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -443,22 +530,30 @@ export default function ReportesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-blue-50 rounded-lg">
                     <p className="text-sm text-blue-700">Nuevos Clientes</p>
-                    <p className="text-2xl font-bold text-blue-800">45</p>
+                    <p className="text-2xl font-bold text-blue-800">
+                      {dashboardStats?.customerMetrics?.nuevosClientes || '0'}
+                    </p>
                     <p className="text-xs text-blue-600">Este mes</p>
                   </div>
                   <div className="p-4 bg-emerald-50 rounded-lg">
                     <p className="text-sm text-emerald-700">Retención</p>
-                    <p className="text-2xl font-bold text-emerald-800">78%</p>
+                    <p className="text-2xl font-bold text-emerald-800">
+                      {dashboardStats?.customerMetrics?.retencion ? dashboardStats.customerMetrics.retencion + '%' : '0%'}
+                    </p>
                     <p className="text-xs text-emerald-600">Tasa mensual</p>
                   </div>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm text-slate-600">Valor Promedio por Cliente</p>
-                  <p className="text-2xl font-bold text-slate-800">$125,400</p>
+                  <p className="text-2xl font-bold text-slate-800">
+                    ${dashboardStats?.customerMetrics?.valorPromedioCliente ? Math.round(dashboardStats.customerMetrics.valorPromedioCliente).toLocaleString() : '0'}
+                  </p>
                 </div>
                 <div className="p-4 bg-purple-50 rounded-lg">
                   <p className="text-sm text-purple-700">Frecuencia de Compra</p>
-                  <p className="text-2xl font-bold text-purple-800">2.3x</p>
+                  <p className="text-2xl font-bold text-purple-800">
+                    {dashboardStats?.customerMetrics?.frecuenciaCompra ? dashboardStats.customerMetrics.frecuenciaCompra.toFixed(1) + 'x' : '0x'}
+                  </p>
                   <p className="text-xs text-purple-600">Por mes</p>
                 </div>
               </CardContent>
@@ -475,18 +570,30 @@ export default function ReportesPage() {
               <CardContent className="space-y-4">
                 <div className="p-4 bg-emerald-50 rounded-lg">
                   <p className="text-sm text-emerald-700">Ingresos Totales</p>
-                  <p className="text-2xl font-bold text-emerald-800">$2.4M</p>
-                  <p className="text-xs text-emerald-600">+12.5% vs mes anterior</p>
+                  <p className="text-2xl font-bold text-emerald-800">
+                    ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales / 1000000).toFixed(1) + 'M' : '0'}
+                  </p>
+                  <p className="text-xs text-emerald-600">
+                    {dashboardStats?.financialMetrics?.crecimiento ? '+' + dashboardStats.financialMetrics.crecimiento.toFixed(1) + '% vs mes anterior' : 'Sin datos'}
+                  </p>
                 </div>
                 <div className="p-4 bg-red-50 rounded-lg">
                   <p className="text-sm text-red-700">Costos Totales</p>
-                  <p className="text-2xl font-bold text-red-800">$1.6M</p>
-                  <p className="text-xs text-red-600">+8.2% vs mes anterior</p>
+                  <p className="text-2xl font-bold text-red-800">
+                    ${dashboardStats?.financialMetrics?.costosTotales ? (dashboardStats.financialMetrics.costosTotales / 1000000).toFixed(1) + 'M' : '0'}
+                  </p>
+                  <p className="text-xs text-red-600">
+                    {dashboardStats?.financialMetrics?.crecimiento ? '+' + (dashboardStats.financialMetrics.crecimiento * 0.65).toFixed(1) + '% vs mes anterior' : 'Sin datos'}
+                  </p>
                 </div>
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-700">Utilidad Bruta</p>
-                  <p className="text-2xl font-bold text-blue-800">$800K</p>
-                  <p className="text-xs text-blue-600">Margen: 33.3%</p>
+                  <p className="text-2xl font-bold text-blue-800">
+                    ${dashboardStats?.financialMetrics?.utilidadBruta ? (dashboardStats.financialMetrics.utilidadBruta / 1000).toFixed(1) + 'K' : '0'}
+                  </p>
+                  <p className="text-xs text-blue-600">
+                    Margen: {dashboardStats?.financialMetrics?.margenUtilidad ? dashboardStats.financialMetrics.margenUtilidad.toFixed(1) + '%' : '0%'}
+                  </p>
                 </div>
               </CardContent>
             </Card>

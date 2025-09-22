@@ -1,312 +1,263 @@
-// Tipos base comunes
-export type Decimal = number;
-export type DateString = string; // Formato: YYYY-MM-DD
-export type DateTimeString = string; // Formato: YYYY-MM-DDTHH:MM:SSZ
-
-// Comprobante
-export interface ComprobantePost {
-  Id_venta: number;
-  tipo_comprobante: string;
-  fecha_emision: DateString;
-  total: Decimal;
+// User and Role Models
+export interface RolUsuario {
+  idRol: number
+  nombreRol: string
 }
 
-export interface ComprobanteGet extends ComprobantePost {
-  Id_comprobante: number;
+export interface Usuario {
+  idUsuario: number
+  nombre: string
+  email: string
+  contraseña: string
+  idRol: number | null
 }
 
-// Venta
-export interface VentaPost {
-  Id_cliente: number;
-  fecha_venta: DateString;
-  total: Decimal;
-  estado: string;
+// Client Models
+export interface Cliente {
+  idCliente: number
+  nombre: string | null
+  dni: string | null
+  tipoCliente: "Minorista" | "Mayorista" | "Institucional"
+  puntos: number
+  email: string | null
+  idPrograma: number | null
 }
 
-export interface VentaGet extends VentaPost {
-  Id_venta: number;
+export interface ClienteCreate {
+  nombre?: string
+  dni?: string
+  tipoCliente: "Minorista" | "Mayorista" | "Institucional"
+  email?: string
+  idPrograma?: number
 }
 
-// VentaCredito
-export interface VentaCreditoPost {
-  Id_venta: number;
-  monto_pendiente: Decimal;
-  fecha_vencimiento: DateString;
-  intereses: Decimal;
+export interface ClienteUpdate {
+  nombre?: string
+  dni?: string
+  tipoCliente?: "Minorista" | "Mayorista" | "Institucional"
+  email?: string
+  puntos?: number
+  idPrograma?: number
 }
 
-export interface VentaCreditoGet extends VentaCreditoPost {
-  Id_venta_credito: number;
+// Supplier Models
+export interface Proveedor {
+  idProveedor: number
+  nombre: string
+  contacto: string | null
+  telefono: string | null
+  email: string | null
 }
 
-// Cliente
-export interface ClientePost {
-  nombre: string;
-  apellido: string;
-  email: string;
-  telefono: string;
-  Id_tipo_cliente: number;
+export interface ProveedorCreate {
+  nombre: string
+  contacto?: string
+  telefono?: string
+  email?: string
 }
 
-export interface ClienteGet extends ClientePost {
-  Id_cliente: number;
+export interface ProveedorUpdate {
+  nombre?: string
+  contacto?: string
+  telefono?: string
+  email?: string
 }
 
-// DetalleVenta
-export interface DetalleVentaPost {
-  Id_venta: number;
-  Id_producto: number;
-  cantidad: number;
-  precio_unitario: Decimal;
+// Product and Category Models
+export interface Categoria {
+  idCategoria: number
+  nombre: string
 }
 
-export interface DetalleVentaGet extends DetalleVentaPost {
-  Id_detalle_venta: number;
+export interface Producto {
+  idProducto: number
+  nombre: string
+  descripcion: string | null
+  precio: number
+  idCategoria: number | null
+  categoria?: Categoria
 }
 
-// PuntosFidelizacion
-export interface PuntosFidelizacionPost {
-  Id_cliente: number;
-  puntos_acumulados: number;
-  fecha_actualizacion: DateString;
+export interface ProductoCreate {
+  nombre: string
+  descripcion?: string
+  precio: number
+  idCategoria?: number
 }
 
-export interface PuntosFidelizacionGet extends PuntosFidelizacionPost {
-  Id_punto_fidelizacion: number;
+export interface ProductoUpdate {
+  nombre?: string
+  descripcion?: string
+  precio?: number
+  idCategoria?: number
 }
 
-// TipoCliente
-export interface TipoClientePost {
-  nombre_tipo: string;
-  descripcion: string;
+// Inventory Models
+export interface Sucursal {
+  idSucursal: number
+  nombre: string
+  direccion: string
 }
 
-export interface TipoClienteGet extends TipoClientePost {
-  Id_tipo_cliente: number;
+export interface Inventario {
+  idInventario: number
+  idSucursal: number
+  idProducto: number
+  stock: number
+  stockMinimo: number
+  producto?: Producto
+  sucursal?: Sucursal
 }
 
-// Producto
-export interface ProductoPost {
-  nombre: string;
-  descripcion: string;
-  precio: Decimal;
-  stock: number;
-  id_marca: number;
-  fecha_creacion: DateString;
-  activo: boolean;
+export interface InventarioCreate {
+  idSucursal: number
+  idProducto: number
+  stock: number
+  stockMinimo?: number
 }
 
-export interface ProductoGet extends ProductoPost {
-  Id_producto: number;
+export interface InventarioUpdate {
+  stock?: number
+  stockMinimo?: number
 }
 
-// Marca
-export interface MarcaPost {
-  nombre: string;
+export interface MovimientoInventario {
+  idMovimiento: number
+  idInventario: number
+  tipoMovimiento: "Venta" | "Compra" | "Ajuste" | "Devolución"
+  cantidad: number
+  fecha: string
+  observacion: string | null
 }
 
-export interface MarcaGet extends MarcaPost {
-  Id_marca: number;
+// Sales Models
+export interface Venta {
+  idVenta: number
+  idCliente: number
+  idUsuario: number
+  fecha: string
+  total: number
+  cliente?: Cliente
+  usuario?: Usuario
+  detalles?: DetalleVenta[]
 }
 
-// ProductoControlPaquete
-export interface ProductoControlPaquetePost {
-  Id_producto: number;
-  Id_control_paquete: number;
-  cantidad: number;
+export interface VentaCreate {
+  idCliente: number
+  idUsuario: number
+  detalles: DetalleVentaCreate[]
 }
 
-export interface ProductoControlPaqueteGet extends ProductoControlPaquetePost {
-  Id_producto_control_paquete: number;
+export interface DetalleVenta {
+  idDetalleVenta: number
+  idVenta: number
+  idProducto: number
+  cantidad: number
+  precioUnitario: number
+  descuentoAplicado: number
+  producto?: Producto
 }
 
-// DetalleCompra
-export interface DetalleCompraPost {
-  Id_compra: number;
-  Id_producto: number;
-  cantidad: number;
-  precio_unitario: Decimal;
+export interface DetalleVentaCreate {
+  idProducto: number
+  cantidad: number
+  precioUnitario: number
+  descuentoAplicado?: number
 }
 
-export interface DetalleCompraGet extends DetalleCompraPost {
-  Id_detalle_compra: number;
+// Purchase Models
+export interface Compra {
+  idCompra: number
+  idProveedor: number
+  idUsuario: number
+  fecha: string
+  total: number
+  proveedor?: Proveedor
+  usuario?: Usuario
+  detalles?: DetalleCompra[]
 }
 
-// RecepcionParcial
-export interface RecepcionParcialPost {
-  Id_compra: number;
-  fecha_recepcion: DateString;
-  cantidad_recibida: number;
+export interface CompraCreate {
+  idProveedor: number
+  idUsuario: number
+  detalles: DetalleCompraCreate[]
 }
 
-export interface RecepcionParcialGet extends RecepcionParcialPost {
-  Id_recepcion_parcial: number;
+export interface DetalleCompra {
+  idDetalleCompra: number
+  idCompra: number
+  idProducto: number
+  cantidad: number
+  precioUnitario: number
+  producto?: Producto
 }
 
-// Compra
-export interface CompraPost {
-  Id_proveedor: number;
-  fecha_compra: DateString;
-  total: Decimal;
-  estado: boolean;
+export interface DetalleCompraCreate {
+  idProducto: number
+  cantidad: number
+  precioUnitario: number
 }
 
-export interface CompraGet extends CompraPost {
-  Id_compra: number;
+// Discount Models
+export interface Descuento {
+  idDescuento: number
+  idProducto: number
+  porcentaje: number
+  fechaInicio: string
+  fechaFin: string
+  estado: boolean
+  producto?: Producto
 }
 
-// DocumentoCompra
-export interface DocumentoCompraPost {
-  Id_compra: number;
-  tipo_documento: string;
-  numero_documento: string;
-  fecha_emision: DateString;
+// Loyalty Program Models
+export interface ProgramaFidelizacion {
+  idPrograma: number
+  puntosPorSol: number
+  mesesDuracion: number
 }
 
-export interface DocumentoCompraGet extends DocumentoCompraPost {
-  Id_documento_compra: number;
+export interface Recompensa {
+  idRecompensa: number
+  titulo: string
+  puntosRequeridos: number
+  descripcion: string | null
+  estado: boolean
+  idPrograma: number
 }
 
-// Proveedor
-export interface ProveedorPost {
-  nombre_empresa: string;
-  contacto: string;
-  telefono: string;
-  email: string;
+// API Response Types
+export interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  message?: string
+  error?: string
 }
 
-export interface ProveedorGet extends ProveedorPost {
-  Id_proveedor: number;
+// Dashboard Analytics Types
+export interface DashboardStats {
+  totalVentas: number
+  ventasHoy: number
+  totalClientes: number
+  productosStock: number
+  productosStockBajo: number
+  ventasMes: VentaMensual[]
+  topProductos: ProductoVendido[]
+  clientesRecientes: Cliente[]
 }
 
-// EvaluacionProveedor
-export interface EvaluacionProveedorPost {
-  Id_proveedor: number;
-  fecha_evaluacion: DateString;
-  puntuacion: number;
-  comentarios: string;
+export interface VentaMensual {
+  mes: string
+  total: number
+  cantidad: number
 }
 
-export interface EvaluacionProveedorGet extends EvaluacionProveedorPost {
-  Id_evaluacion: number;
+export interface ProductoVendido {
+  producto: Producto
+  cantidadVendida: number
+  totalVentas: number
 }
 
-// Auditoria
-export interface AuditoriaPost {
-  Id_usuario: number;
-  fecha_hora: DateTimeString;
-  accion: string;
-  detalle: string;
-}
 
-export interface AuditoriaGet extends AuditoriaPost {
-  Id_auditoria: number;
-}
 
-// PedidoReposicion
-export interface PedidoReposicionPost {
-  Id_proveedor: number;
-  fecha_pedido: DateString;
-  fecha_entrega: DateString;
-  estado: string;
-}
 
-export interface PedidoReposicionGet extends PedidoReposicionPost {
-  Id_pedido_reposicion: number;
-}
 
-// Usuario
-export interface UsuarioPost {
-  Id_rol: number;
-  nombre_usuario: string;
-  password: string;
-  email: string;
-  activo: boolean;
-}
-
-export interface UsuarioGet extends UsuarioPost {
-  Id_usuario: number;
-}
-
-// Rol
-export interface RolPost {
-  nombre_rol: string;
-  descripcion: string;
-}
-
-export interface RolGet extends RolPost {
-  Id_rol: number;
-}
-
-// Funciones de utilidad para hacer peticiones
-export const apiClient = {
-  // Ejemplo para productos
-  productos: {
-    crear: async (producto: ProductoPost): Promise<ProductoGet> => {
-      const response = await fetch('/api/productos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(producto),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al crear el producto');
-      }
-      
-      return response.json();
-    },
-    
-    obtenerTodos: async (): Promise<ProductoGet[]> => {
-      const response = await fetch('/api/productos');
-      
-      if (!response.ok) {
-        throw new Error('Error al obtener productos');
-      }
-      
-      return response.json();
-    },
-    
-    obtenerPorId: async (id: number): Promise<ProductoGet> => {
-      const response = await fetch(`/api/productos/${id}`);
-      
-      if (!response.ok) {
-        throw new Error('Error al obtener el producto');
-      }
-      
-      return response.json();
-    },
-    
-    actualizar: async (id: number, producto: ProductoPost): Promise<ProductoGet> => {
-      const response = await fetch(`/api/productos/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(producto),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al actualizar el producto');
-      }
-      
-      return response.json();
-    },
-    
-    eliminar: async (id: number): Promise<void> => {
-      const response = await fetch(`/api/productos/${id}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al eliminar el producto');
-      }
-    }
-  },
-  
-  // Puedes agregar métodos similares para las demás entidades
-  // clientes: { ... },
-  // ventas: { ... },
-  // etc.
-};

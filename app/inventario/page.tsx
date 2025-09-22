@@ -1,449 +1,540 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Header } from "@/components/header"
-import { Sidebar } from "@/components/sidebar"
+import type React from "react"
+
+import { useEffect, useState } from "react"
+import { DashboardLayout } from "@/components/ui/dashboard-layout"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { AlertTriangle, Package, TrendingUp, Plus, Minus, Search, DollarSign, Tag } from "lucide-react"
-import { StockAdjustmentForm } from "@/components/stock-adjustment-form"
-import { BulkPriceUpdateForm } from "@/components/bulk-price-update-form"
-import { InventoryMovements } from "@/components/inventory-movements"
-import { ProductoGet } from '@/lib/models'
-import { CategoryManager } from "@/components/category-manager"
-import { ProductForm } from "@/components/product-form"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Search, AlertTriangle, Package, Edit, Trash2 } from "lucide-react"
+import type { Inventario, Producto, Categoria, ApiResponse, InventarioCreate, Sucursal } from "@/lib/models"
+import { inventarioService } from "@/lib/services/inventario"
+import { productosService } from "@/lib/services/productos"
 
-const mockAlerts = [
-  {
-    id: 1,
-    type: "low_stock",
-    product: "Cuaderno Universitario 100 hojas",
-    message: "Stock por debajo del mínimo (15/20)",
-    priority: "medium",
-    date: "2024-01-16",
-  },
-  {
-    id: 2,
-    type: "critical_stock",
-    product: "Cien Años de Soledad",
-    message: "Stock crítico (5/5)",
-    priority: "high",
-    date: "2024-01-16",
-  },
-  {
-    id: 3,
-    type: "overstock",
-    product: "Bolígrafo BIC Azul",
-    message: "Stock alto, considerar reducir pedidos",
-    priority: "low",
-    date: "2024-01-15",
-  },
-]
-
-export default function InventoryPage() {
-  const [inventory, setInventory] = useState([])
-  const [alerts, setAlerts] = useState(mockAlerts)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedFilter, setSelectedFilter] = useState("all")
-  const [isAdjustmentFormOpen, setIsAdjustmentFormOpen] = useState(false)
-  const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState(null)
+export default function InventarioPage() {
+  const [inventario, setInventario] = useState<Inventario[]>([])
+  const [productos, setProductos] = useState<Producto[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterCategory, setFilterCategory] = useState<string>("all")
+  const [filterStock, setFilterStock] = useState<string>("all")
 
-  const [isProductFormOpen, setIsProductFormOpen] = useState(false)
-  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
-  const [editingProduct, setEditingProduct] = useState(null)
+  // Dialog states
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<Inventario | null>(null)
 
-  const filteredInventory = inventory.filter((item:ProductoGet) => {
-    const matchesSearch =
-      item.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.Id_producto.toString().toLowerCase().includes(searchTerm.toLowerCase())
-
-    const matchesFilter =
-      selectedFilter === "all" ||
-      (selectedFilter === "low_stock" && item.stock < 5) ||
-      (selectedFilter === "critical" && item.stock < 50) ||
-      (selectedFilter === "normal" && item.stock < 500)
-
-    return matchesSearch && matchesFilter
+  // Form states
+  const [formData, setFormData] = useState({
+    idSucursal: "",
+    idProducto: "",
+    stock: "",
+    stockMinimo: "",
   })
 
-  const getStockStatusBadge = (activo:boolean) => {
-    if(activo){
-      return <Badge variant="default">Normal</Badge>
-    }else{
-
-      return <Badge variant="destructive">Crítico</Badge>
-    }
-  }
-
-  const getAlertIcon = (priority:any) => {
-    switch (priority) {
-      case "high":
-        return <AlertTriangle className="h-4 w-4 text-destructive" />
-      case "medium":
-        return <AlertTriangle className="h-4 w-4 text-orange-500" />
-      case "low":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />
-      default:
-        return <AlertTriangle className="h-4 w-4" />
-    }
-  }
-
-  const totalInventoryValue = inventory.reduce((sum, item:ProductoGet) => sum + item.precio, 0)
-  const lowStockItems = inventory.filter((item:ProductoGet) => item.stock < 5 || item.stock < 50).length
-  const totalProducts = inventory.length
-
   useEffect(() => {
-    let mounted=true;
-    fetch("http://localhost:8000/productos/")
-      .then((r) => r.json())
-      .then((data) => {
-        setInventory(data)
-      })
-      .catch(console.error)
-      .finally(() => mounted && setLoading(false))
-    return () => {
-      mounted = false
-    }
+    fetchData()
   }, [])
-  
+
+  const [sucursales, setSucursales] = useState<Sucursal[]>([])
+
+  const fetchData = async () => {
+    try {
+      const [inventarioData, productosData, categoriasData, sucursalesData] = await Promise.all([
+        inventarioService.getInventarios(),
+        productosService.getProductos(),
+        productosService.getCategorias(),
+        inventarioService.getSucursales(),
+      ])
+
+
+
+      if (inventarioData.success && inventarioData.data) {
+        setInventario(inventarioData.data)
+      } else {
+        console.error("Error in inventario response:", inventarioData.message)
+      }
+      
+      if (productosData.success && productosData.data) {
+        setProductos(productosData.data)
+      } else {
+        console.error("Error in productos response:", productosData.message)
+      }
+      
+      if (categoriasData.success && categoriasData.data) {
+        setCategorias(categoriasData.data)
+      } else {
+        console.error("Error in categorias response:", categoriasData.message)
+      }
+
+      // Handle both ApiResponse format and direct array response
+      let sucursalesArray: Sucursal[] = [];
+      
+      if (Array.isArray(sucursalesData)) {
+        // Direct array response from backend
+        sucursalesArray = sucursalesData;
+      } else if (sucursalesData.success && sucursalesData.data) {
+        // ApiResponse format
+        sucursalesArray = sucursalesData.data;
+      } else {
+        console.error("Error in sucursales response:", sucursalesData.message)
+      }
+      
+      setSucursales(sucursalesArray)
+      // Set default sucursal if available
+      if (sucursalesArray.length > 0 && !formData.idSucursal) {
+        const firstSucursal = sucursalesArray[0];
+        setFormData(prev => ({ ...prev, idSucursal: firstSucursal.idSucursal.toString() }))
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredInventario = inventario.filter((item) => {
+    const matchesSearch = item.producto?.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || false
+    const matchesCategory = filterCategory === "all" || item.producto?.idCategoria?.toString() === filterCategory
+    const matchesStock =
+      filterStock === "all" ||
+      (filterStock === "low" && item.stock <= item.stockMinimo) ||
+      (filterStock === "normal" && item.stock > item.stockMinimo)
+
+    return matchesSearch && matchesCategory && matchesStock
+  })
+
+  const getStockStatus = (stock: number, stockMinimo: number) => {
+    if (stock === 0) return { label: "Sin Stock", variant: "destructive" as const }
+    if (stock <= stockMinimo) return { label: "Stock Bajo", variant: "secondary" as const }
+    return { label: "En Stock", variant: "default" as const }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const inventoryData: InventarioCreate = {
+        idSucursal: parseInt(formData.idSucursal),
+        idProducto: parseInt(formData.idProducto),
+        stock: parseInt(formData.stock),
+        stockMinimo: parseInt(formData.stockMinimo) || 0,
+      }
+
+      let result: ApiResponse<Inventario>
+      if (editingItem) {
+        // Update existing inventory
+        result = await inventarioService.updateInventario(editingItem.idInventario, inventoryData)
+      } else {
+        // Create new inventory
+        result = await inventarioService.createInventario(inventoryData)
+      }
+
+      if (result.success) {
+        // Refresh data after successful operation
+        await fetchData()
+        setIsAddDialogOpen(false)
+        setIsEditDialogOpen(false)
+        resetForm()
+      } else {
+        console.error("Error:", result.message)
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      idSucursal: sucursales.length > 0 && sucursales[0] ? sucursales[0].idSucursal.toString() : "",
+      idProducto: "",
+      stock: "",
+      stockMinimo: "",
+    })
+    setEditingItem(null)
+  }
+
+  const handleEdit = (item: Inventario) => {
+    setEditingItem(item)
+    setFormData({
+      idSucursal: item.idSucursal.toString(),
+      idProducto: item.idProducto.toString(),
+      stock: item.stock.toString(),
+      stockMinimo: item.stockMinimo.toString(),
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleDelete = async (item: Inventario) => {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar el inventario de ${item.producto?.nombre}?`)) {
+      try {
+        const result = await inventarioService.deleteInventario(item.idInventario)
+        if (result.success) {
+          // Refresh data after successful deletion
+          await fetchData()
+        } else {
+          console.error("Error deleting inventario:", result.message)
+          alert("Error al eliminar el inventario: " + result.message)
+        }
+      } catch (error) {
+        console.error("Error deleting inventario:", error)
+        alert("Error al eliminar el inventario")
+      }
+    }
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-2 text-muted-foreground">Cargando inventario...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  const lowStockCount = inventario.filter((item) => item.stock <= item.stockMinimo).length
+  const outOfStockCount = inventario.filter((item) => item.stock === 0).length
 
   return (
-    <div className="flex h-screen bg-background">
-      <div className="hidden md:block">
-        <Sidebar />
-      </div>
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-serif font-bold text-foreground">Control de Inventario</h2>
-                <p className="text-muted-foreground">Gestiona el stock y movimientos de inventario</p>
-              </div>
-              <div className="flex gap-2">
-                <Dialog open={isCategoryManagerOpen} onOpenChange={setIsCategoryManagerOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Tag className="h-4 w-4 mr-2" />
-                      Categorías
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Gestión de Categorías</DialogTitle>
-                      <DialogDescription>Administra las categorías de productos</DialogDescription>
-                    </DialogHeader>
-                    <CategoryManager />
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={isProductFormOpen} onOpenChange={setIsProductFormOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Nuevo Producto
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
-                      <DialogDescription>
-                        {editingProduct ? "Modifica los datos del producto" : "Agrega un nuevo producto al catálogo"}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <ProductForm
-                      product={editingProduct}
-                      onClose={() => {
-                        setIsProductFormOpen(false)
-                        setEditingProduct(null)
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <div className="flex gap-2">
-                <Dialog open={isBulkUpdateOpen} onOpenChange={setIsBulkUpdateOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      Actualizar Precios
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Actualización Masiva de Precios</DialogTitle>
-                      <DialogDescription>Actualiza precios de múltiples productos</DialogDescription>
-                    </DialogHeader>
-                    <BulkPriceUpdateForm onClose={() => setIsBulkUpdateOpen(false)} />
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={isAdjustmentFormOpen} onOpenChange={setIsAdjustmentFormOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Package className="h-4 w-4 mr-2" />
-                      Ajustar Stock
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Ajuste de Inventario</DialogTitle>
-                      <DialogDescription>Realiza ajustes manuales al inventario</DialogDescription>
-                    </DialogHeader>
-                    <StockAdjustmentForm
-                      product={selectedProduct}
-                      onClose={() => {
-                        setIsAdjustmentFormOpen(false)
-                        setSelectedProduct(null)
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Valor Total Inventario</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${totalInventoryValue.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Costo de inventario actual</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{totalProducts}</div>
-                  <p className="text-xs text-muted-foreground">Productos en inventario</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Alertas de Stock</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-destructive">{lowStockItems}</div>
-                  <p className="text-xs text-muted-foreground">Productos requieren atención</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Movimientos Hoy</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">24</div>
-                  <p className="text-xs text-muted-foreground">Entradas y salidas</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Tabs defaultValue="inventory" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="inventory">Inventario</TabsTrigger>
-                <TabsTrigger value="alerts">Alertas</TabsTrigger>
-                <TabsTrigger value="movements">Movimientos</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="inventory" className="space-y-4">
-                {/* Filters */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Filtros</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-4 items-center">
-                      <div className="flex-1">
-                        <div className="relative">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Buscar productos..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-8"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={selectedFilter === "all" ? "default" : "outline"}
-                          onClick={() => setSelectedFilter("all")}
-                        >
-                          Todos
-                        </Button>
-                        <Button
-                          variant={selectedFilter === "critical" ? "default" : "outline"}
-                          onClick={() => setSelectedFilter("critical")}
-                        >
-                          Crítico
-                        </Button>
-                        <Button
-                          variant={selectedFilter === "low_stock" ? "default" : "outline"}
-                          onClick={() => setSelectedFilter("low_stock")}
-                        >
-                          Stock Bajo
-                        </Button>
-                        <Button
-                          variant={selectedFilter === "normal" ? "default" : "outline"}
-                          onClick={() => setSelectedFilter("normal")}
-                        >
-                          Normal
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Inventory Table */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Estado del Inventario</CardTitle>
-                    <CardDescription>{filteredInventory.length} productos encontrados</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Producto</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Categoría</TableHead>
-                          <TableHead>Stock Actual</TableHead>
-                          <TableHead>Stock Mín/Máx</TableHead>
-                          <TableHead>Precio Costo</TableHead>
-                          <TableHead>Valor Total</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredInventory.map((item:ProductoGet) => (
-                          <TableRow key={item.Id_producto}>
-                            <TableCell className="font-medium">{item.nombre}</TableCell>
-                            <TableCell>{item.Id_producto}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{item.id_marca}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold">{item.stock}</span>
-                                {item.stock <= 50 && (
-                                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-sm text-muted-foreground">
-                                {item.stock} / {item.stock * 23}
-                              </span>
-                            </TableCell>
-                            <TableCell>${item.precio.toFixed(2)}</TableCell>
-                            <TableCell>${item.precio.toFixed(4)}</TableCell>
-                            <TableCell>{getStockStatusBadge(item.activo)}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedProduct(item as any)
-                                    setIsAdjustmentFormOpen(true)
-                                  }}
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedProduct(item as any)
-                                    setIsAdjustmentFormOpen(true)
-                                  }}
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="alerts" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Alertas de Inventario</CardTitle>
-                    <CardDescription>Notificaciones importantes sobre el stock</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {alerts.map((alert) => (
-                        <div key={alert.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            {getAlertIcon(alert.priority)}
-                            <div>
-                              <div className="font-medium">{alert.product}</div>
-                              <div className="text-sm text-muted-foreground">{alert.message}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                alert.priority === "high"
-                                  ? "destructive"
-                                  : alert.priority === "medium"
-                                    ? "secondary"
-                                    : "outline"
-                              }
-                            >
-                              {alert.priority === "high" ? "Alta" : alert.priority === "medium" ? "Media" : "Baja"}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">{alert.date}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="movements" className="space-y-4">
-                <InventoryMovements />
-              </TabsContent>
-            </Tabs>
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-balance">Gestión de Inventario</h2>
+            <p className="text-muted-foreground">Administra el stock de tus productos</p>
           </div>
-        </main>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar al Inventario
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Agregar Producto al Inventario</DialogTitle>
+                <DialogDescription>Agrega un nuevo producto al inventario de la sucursal.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit}>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="sucursal">Sucursal</Label>
+                    <Select
+                      value={formData.idSucursal}
+                      onValueChange={(value) => setFormData({ ...formData, idSucursal: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar sucursal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sucursales.map((sucursal) => (
+                          <SelectItem key={sucursal.idSucursal} value={sucursal.idSucursal.toString()}>
+                            {sucursal.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="producto">Producto</Label>
+                    <Select
+                      value={formData.idProducto}
+                      onValueChange={(value) => setFormData({ ...formData, idProducto: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar producto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {productos.map((producto) => (
+                          <SelectItem key={producto.idProducto} value={producto.idProducto.toString()}>
+                            {producto.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="stock">Stock Inicial</Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      value={formData.stock}
+                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                      placeholder="Cantidad en stock"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="stockMinimo">Stock Mínimo</Label>
+                    <Input
+                      id="stockMinimo"
+                      type="number"
+                      value={formData.stockMinimo}
+                      onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
+                      placeholder="Stock mínimo requerido"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit">Agregar</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{inventario.length}</div>
+              <p className="text-xs text-muted-foreground">En inventario</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{lowStockCount}</div>
+              <p className="text-xs text-muted-foreground">Requieren reposición</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Sin Stock</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{outOfStockCount}</div>
+              <p className="text-xs text-muted-foreground">Productos agotados</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Filtros</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar productos..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {categorias.map((categoria) => (
+                    <SelectItem key={categoria.idCategoria} value={categoria.idCategoria.toString()}>
+                      {categoria.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterStock} onValueChange={setFilterStock}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Estado de stock" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="normal">En stock</SelectItem>
+                  <SelectItem value="low">Stock bajo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Inventory Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Inventario</CardTitle>
+            <CardDescription>Lista completa de productos en inventario</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Producto</TableHead>
+                  <TableHead>Categoría</TableHead>
+                  <TableHead>Precio</TableHead>
+                  <TableHead>Stock Actual</TableHead>
+                  <TableHead>Stock Mínimo</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Sucursal</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredInventario.length > 0 ? (
+                  filteredInventario.map((item) => {
+                    const status = getStockStatus(item.stock, item.stockMinimo)
+                    return (
+                      <TableRow key={item.idInventario}>
+                        <TableCell className="font-medium">
+                          <div>
+                            <p className="font-medium">{item.producto?.nombre}</p>
+                            <p className="text-sm text-muted-foreground">{item.producto?.descripcion}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {categorias.find((c) => c.idCategoria === item.producto?.idCategoria)?.nombre ||
+                              "Sin categoría"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>S/ {item.producto?.precio.toFixed(2)}</TableCell>
+                        <TableCell>
+                          <span className={item.stock <= item.stockMinimo ? "text-orange-600 font-medium" : ""}>
+                            {item.stock}
+                          </span>
+                        </TableCell>
+                        <TableCell>{item.stockMinimo}</TableCell>
+                        <TableCell>
+                          <Badge variant={status.variant}>{status.label}</Badge>
+                        </TableCell>
+                        <TableCell>{item.sucursal?.nombre}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete(item)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-4">
+                      {inventario.length === 0 ? "No hay productos en inventario. Agrega algunos usando el botón 'Agregar al Inventario'." : "No se encontraron productos con los filtros aplicados"}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Inventario</DialogTitle>
+              <DialogDescription>Actualiza la información del inventario.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit}>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-sucursal">Sucursal</Label>
+                  <Select
+                    value={formData.idSucursal}
+                    onValueChange={(value) => setFormData({ ...formData, idSucursal: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar sucursal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sucursales.map((sucursal) => (
+                        <SelectItem key={sucursal.idSucursal} value={sucursal.idSucursal.toString()}>
+                          {sucursal.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-producto">Producto</Label>
+                  <Select
+                    value={formData.idProducto}
+                    onValueChange={(value) => setFormData({ ...formData, idProducto: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar producto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productos.map((producto) => (
+                        <SelectItem key={producto.idProducto} value={producto.idProducto.toString()}>
+                          {producto.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-stock">Stock Actual</Label>
+                  <Input
+                    id="edit-stock"
+                    type="number"
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    placeholder="Cantidad en stock"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-stockMinimo">Stock Mínimo</Label>
+                  <Input
+                    id="edit-stockMinimo"
+                    type="number"
+                    value={formData.stockMinimo}
+                    onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
+                    placeholder="Stock mínimo requerido"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Actualizar</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

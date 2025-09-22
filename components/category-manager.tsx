@@ -1,108 +1,101 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, MoreHorizontal, Edit, Trash2, Tag } from "lucide-react"
+import { Plus, Edit, Trash2, Tag, AlertCircle } from "lucide-react"
+import { productosService } from "@/lib/services/productos"
+import { Categoria } from "@/lib/models"
 
-const mockCategories = [
-  { id: 1, name: "Escolares", description: "Productos para estudiantes", productCount: 45 },
-  { id: 2, name: "Útiles", description: "Útiles de escritorio", productCount: 32 },
-  { id: 3, name: "Libros", description: "Literatura y textos", productCount: 28 },
-  { id: 4, name: "Arte", description: "Materiales artísticos", productCount: 15 },
-  { id: 5, name: "Oficina", description: "Suministros de oficina", productCount: 22 },
-  { id: 6, name: "Combos", description: "Paquetes de productos", productCount: 8 },
-]
+interface CategoryManagerProps {
+  products: any[]
+}
 
-const mockBrands = [
-  { id: 1, name: "Norma", productCount: 25 },
-  { id: 2, name: "BIC", productCount: 18 },
-  { id: 3, name: "Faber-Castell", productCount: 12 },
-  { id: 4, name: "Pilot", productCount: 8 },
-]
+export function CategoryManager({ products }: CategoryManagerProps) {
+  const [categories, setCategories] = useState<Categoria[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [newCategory, setNewCategory] = useState({ nombre: "" })
 
-const mockAuthors = [
-  { id: 1, name: "Gabriel García Márquez", productCount: 3 },
-  { id: 2, name: "Mario Vargas Llosa", productCount: 2 },
-  { id: 3, name: "Isabel Allende", productCount: 4 },
-]
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await productosService.getCategorias()
+        if (response.success && response.data) {
+          setCategories(response.data)
+        } else {
+          throw new Error(response.message || 'Error al cargar categorías')
+        }
+      } catch (err) {
+        console.error('Error fetching categories:', err)
+        setError(err instanceof Error ? err.message : 'Error desconocido al cargar categorías')
+      } finally {
+        setLoading(false)
+      }
+    }
 
-const mockPublishers = [
-  { id: 1, name: "Editorial Sudamericana", productCount: 8 },
-  { id: 2, name: "Planeta", productCount: 6 },
-  { id: 3, name: "Alfaguara", productCount: 5 },
-]
+    fetchCategories()
+  }, [])
 
-export function CategoryManager() {
-  const [categories, setCategories] = useState(mockCategories)
-  const [brands, setBrands] = useState(mockBrands)
-  const [authors, setAuthors] = useState(mockAuthors)
-  const [publishers, setPublishers] = useState(mockPublishers)
-
-  const [newCategory, setNewCategory] = useState({ name: "", description: "" })
-  const [newBrand, setNewBrand] = useState("")
-  const [newAuthor, setNewAuthor] = useState("")
-  const [newPublisher, setNewPublisher] = useState("")
-
-  const handleAddCategory = () => {
-    if (newCategory.name.trim()) {
-      setCategories([
-        ...categories,
-        {
-          id: Date.now(),
-          name: newCategory.name,
-          description: newCategory.description,
-          productCount: 0,
-        },
-      ])
-      setNewCategory({ name: "", description: "" })
+  const handleAddCategory = async () => {
+    if (newCategory.nombre.trim()) {
+      try {
+        setError(null)
+        const response = await productosService.createCategoria(newCategory)
+        if (response.success && response.data) {
+          const newCat = response.data
+          setCategories(prev => [...prev, newCat])
+          setNewCategory({ nombre: "" })
+        } else {
+          throw new Error(response.message || 'Error al crear categoría')
+        }
+      } catch (err) {
+        console.error('Error creating category:', err)
+        setError(err instanceof Error ? err.message : 'Error desconocido al crear categoría')
+      }
     }
   }
 
-  const handleAddBrand = () => {
-    if (newBrand.trim()) {
-      setBrands([
-        ...brands,
-        {
-          id: Date.now(),
-          name: newBrand,
-          productCount: 0,
-        },
-      ])
-      setNewBrand("")
+  const handleDeleteCategory = async (id: number) => {
+    try {
+      setError(null)
+      const response = await productosService.deleteCategoria(id)
+      if (response.success) {
+        setCategories(prev => prev.filter(cat => cat.idCategoria !== id))
+      } else {
+        throw new Error(response.message || 'Error al eliminar categoría')
+      }
+    } catch (err) {
+      console.error('Error deleting category:', err)
+      setError(err instanceof Error ? err.message : 'Error desconocido al eliminar categoría')
     }
   }
 
-  const handleAddAuthor = () => {
-    if (newAuthor.trim()) {
-      setAuthors([
-        ...authors,
-        {
-          id: Date.now(),
-          name: newAuthor,
-          productCount: 0,
-        },
-      ])
-      setNewAuthor("")
-    }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Cargando categorías...</p>
+        </div>
+      </div>
+    )
   }
 
-  const handleAddPublisher = () => {
-    if (newPublisher.trim()) {
-      setPublishers([
-        ...publishers,
-        {
-          id: Date.now(),
-          name: newPublisher,
-          productCount: 0,
-        },
-      ])
-      setNewPublisher("")
-    }
+  if (error) {
+    return (
+      <div className="text-center p-6">
+        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-foreground mb-2">Error al cargar categorías</h2>
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <Button onClick={() => window.location.reload()}>Reintentar</Button>
+      </div>
+    )
   }
 
   return (
@@ -117,19 +110,20 @@ export function CategoryManager() {
           <CardDescription>Gestiona las categorías de productos</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+                <span className="text-red-800 text-sm">{error}</span>
+              </div>
+            </div>
+          )}
           <div className="flex gap-2">
             <div className="flex-1">
               <Input
                 placeholder="Nombre de la categoría"
-                value={newCategory.name}
-                onChange={(e) => setNewCategory((prev) => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-            <div className="flex-1">
-              <Input
-                placeholder="Descripción"
-                value={newCategory.description}
-                onChange={(e) => setNewCategory((prev) => ({ ...prev, description: e.target.value }))}
+                value={newCategory.nombre}
+                onChange={(e) => setNewCategory({ nombre: e.target.value })}
               />
             </div>
             <Button onClick={handleAddCategory}>
@@ -141,37 +135,32 @@ export function CategoryManager() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Productos</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                 <TableHead>Productos</TableHead>
+                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {categories.map((category) => (
-                <TableRow key={category.id}>
-                  <TableCell className="font-medium">{category.name}</TableCell>
-                  <TableCell>{category.description}</TableCell>
+                <TableRow key={category.idCategoria}>
+                  <TableCell className="font-medium">{category.nombre}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{category.productCount}</Badge>
+                    <Badge variant="secondary">
+                      {products.filter(product => product.idCategoria === category.idCategoria).length}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteCategory(category.idCategoria)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -180,118 +169,6 @@ export function CategoryManager() {
         </CardContent>
       </Card>
 
-      {/* Brands */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Marcas</CardTitle>
-          <CardDescription>Gestiona las marcas de productos</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input placeholder="Nombre de la marca" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} />
-            <Button onClick={handleAddBrand}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            {brands.map((brand) => (
-              <div key={brand.id} className="flex items-center justify-between p-2 border rounded">
-                <span>{brand.name}</span>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{brand.productCount}</Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Eliminar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Authors and Publishers */}
-      <div className="grid grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Autores</CardTitle>
-            <CardDescription>Para libros y publicaciones</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input placeholder="Nombre del autor" value={newAuthor} onChange={(e) => setNewAuthor(e.target.value)} />
-              <Button onClick={handleAddAuthor}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              {authors.map((author) => (
-                <div key={author.id} className="flex items-center justify-between p-2 border rounded">
-                  <span className="text-sm">{author.name}</span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {author.productCount}
-                    </Badge>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Editoriales</CardTitle>
-            <CardDescription>Para libros y publicaciones</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nombre de la editorial"
-                value={newPublisher}
-                onChange={(e) => setNewPublisher(e.target.value)}
-              />
-              <Button onClick={handleAddPublisher}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              {publishers.map((publisher) => (
-                <div key={publisher.id} className="flex items-center justify-between p-2 border rounded">
-                  <span className="text-sm">{publisher.name}</span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {publisher.productCount}
-                    </Badge>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }

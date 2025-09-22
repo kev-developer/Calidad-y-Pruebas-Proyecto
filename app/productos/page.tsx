@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Header } from "@/components/header"
-import { Sidebar } from "@/components/sidebar"
+import { useState, useEffect } from "react"
+import { DashboardLayout } from "@/components/ui/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,7 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -24,114 +22,133 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Package, Tag } from "lucide-react"
+import { Plus, Search, Filter, Edit, Trash2, Package, Tag, AlertCircle } from "lucide-react"
 import { ProductForm } from "@/components/product-form"
 import { CategoryManager } from "@/components/category-manager"
-
-// Mock data for products
-const mockProducts = [
-  {
-    id: 1,
-    name: "Cuaderno Universitario 100 hojas",
-    category: "Escolares",
-    brand: "Norma",
-    author: "",
-    publisher: "",
-    sku: "CU-100-001",
-    costPrice: 2.5,
-    salePrice: 4.0,
-    stock: 150,
-    minStock: 20,
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "Bolígrafo BIC Azul",
-    category: "Útiles",
-    brand: "BIC",
-    author: "",
-    publisher: "",
-    sku: "BOL-BIC-001",
-    costPrice: 0.8,
-    salePrice: 1.5,
-    stock: 300,
-    minStock: 50,
-    status: "active",
-  },
-  {
-    id: 3,
-    name: "Cien Años de Soledad",
-    category: "Libros",
-    brand: "",
-    author: "Gabriel García Márquez",
-    publisher: "Editorial Sudamericana",
-    sku: "LIB-CAS-001",
-    costPrice: 15.0,
-    salePrice: 25.0,
-    stock: 25,
-    minStock: 5,
-    status: "active",
-  },
-  {
-    id: 4,
-    name: "Kit Escolar Básico",
-    category: "Combos",
-    brand: "Varios",
-    author: "",
-    publisher: "",
-    sku: "KIT-ESC-001",
-    costPrice: 12.0,
-    salePrice: 20.0,
-    stock: 45,
-    minStock: 10,
-    status: "active",
-  },
-]
+import { productosService } from "@/lib/services/productos"
+import { Producto, Categoria } from "@/lib/models"
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState(mockProducts)
+  const [products, setProducts] = useState<Producto[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [isProductFormOpen, setIsProductFormOpen] = useState(false)
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
-  const [editingProduct, setEditingProduct] = useState(null)
+  const [editingProduct, setEditingProduct] = useState<Producto | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const categories = ["Todos", "Escolares", "Útiles", "Libros", "Arte", "Oficina", "Combos"]
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const [productosResponse, categoriasResponse] = await Promise.all([
+          productosService.getProductos(),
+          productosService.getCategorias()
+        ])
+
+        if (productosResponse.success && productosResponse.data) {
+          setProducts(productosResponse.data)
+        } else {
+          throw new Error(productosResponse.message || 'Error al cargar productos')
+        }
+
+        if (categoriasResponse.success && categoriasResponse.data) {
+          setCategorias(categoriasResponse.data)
+        } else {
+          throw new Error(categoriasResponse.message || 'Error al cargar categorías')
+        }
+
+      } catch (err) {
+        console.error('Error fetching data:', err)
+        setError(err instanceof Error ? err.message : 'Error desconocido al cargar datos')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory
+      product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.descripcion && product.descripcion.toLowerCase().includes(searchTerm.toLowerCase()))
+    
+    const matchesCategory = selectedCategory === "all" ||
+      (product.categoria && product.categoria.nombre === selectedCategory)
+    
     return matchesSearch && matchesCategory
   })
 
-  const handleEditProduct = (product:any) => {
+  const handleEditProduct = (product: Producto) => {
     setEditingProduct(product)
     setIsProductFormOpen(true)
   }
 
-  const handleDeleteProduct = (productId:any) => {
-    setProducts(products.filter((p) => p.id !== productId))
+  const handleDeleteProduct = async (productId: number) => {
+    try {
+      const response = await productosService.deleteProducto(productId)
+      if (response.success) {
+        setProducts(products.filter((p) => p.idProducto !== productId))
+      } else {
+        throw new Error(response.message || 'Error al eliminar producto')
+      }
+    } catch (err) {
+      console.error('Error deleting product:', err)
+      setError(err instanceof Error ? err.message : 'Error desconocido al eliminar producto')
+    }
   }
 
-  const getStockStatus = (stock:any, minStock:any) => {
-    if (stock <= minStock) return { label: "Stock Bajo", variant: "destructive" }
-    if (stock <= minStock * 2) return { label: "Stock Medio", variant: "secondary" }
-    return { label: "Stock Alto", variant: "default" }
+  const handleProductCreated = (newProduct: Producto) => {
+    setProducts(prev => [...prev, newProduct])
+  }
+
+  const handleProductUpdated = (updatedProduct: Producto) => {
+    setProducts(prev => prev.map(p =>
+      p.idProducto === updatedProduct.idProducto ? updatedProduct : p
+    ))
+  }
+
+  const getStockStatus = () => {
+    // Función placeholder ya que el modelo Producto no incluye información de inventario
+    return { label: "Info no disponible", variant: "secondary" }
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-2 text-muted-foreground">Cargando productos...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Error al cargar productos</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Reintentar</Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <div className="hidden md:block">
-        <Sidebar />
-      </div>
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
+    <DashboardLayout>
+      <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-3xl font-serif font-bold text-foreground">Gestión de Productos</h2>
@@ -150,7 +167,7 @@ export default function ProductsPage() {
                       <DialogTitle>Gestión de Categorías</DialogTitle>
                       <DialogDescription>Administra las categorías de productos</DialogDescription>
                     </DialogHeader>
-                    <CategoryManager />
+                    <CategoryManager products={products} />
                   </DialogContent>
                 </Dialog>
 
@@ -194,35 +211,31 @@ export default function ProductsPage() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
-                  <Package className="h-4 w-4 text-destructive" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-destructive">
-                    {products.filter((p) => p.stock <= p.minStock).length}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Valor Inventario</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ${products.reduce((sum, p) => sum + p.costPrice * p.stock, 0).toFixed(2)}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Categorías</CardTitle>
                   <Tag className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{new Set(products.map((p) => p.category)).size}</div>
+                  <div className="text-2xl font-bold">{categorias.length}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Productos Activos</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{products.length}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Gestión</CardTitle>
+                  <Tag className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-muted-foreground">Datos en tiempo real</div>
                 </CardContent>
               </Card>
             </div>
@@ -257,9 +270,9 @@ export default function ProductsPage() {
                         Todas las categorías
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      {categories.slice(1).map((category) => (
-                        <DropdownMenuItem key={category} onClick={() => setSelectedCategory(category)}>
-                          {category}
+                      {categorias.map((categoria) => (
+                        <DropdownMenuItem key={categoria.idCategoria} onClick={() => setSelectedCategory(categoria.nombre)}>
+                          {categoria.nombre}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -279,65 +292,39 @@ export default function ProductsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Producto</TableHead>
-                      <TableHead>SKU</TableHead>
                       <TableHead>Categoría</TableHead>
-                      <TableHead>Marca/Autor</TableHead>
-                      <TableHead>Precio Costo</TableHead>
-                      <TableHead>Precio Venta</TableHead>
-                      <TableHead>Stock</TableHead>
-                      <TableHead>Estado</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Precio</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredProducts.map((product) => {
-                      const stockStatus = getStockStatus(product.stock, product.minStock)
+                      // Obtener el nombre de la categoría del producto
+                      const categoriaNombre = product.categoria?.nombre ||
+                        (product.idCategoria ?
+                          categorias.find(cat => cat.idCategoria === product.idCategoria)?.nombre :
+                          'Sin categoría')
+                      
                       return (
-                        <TableRow key={product.id}>
-                          <TableCell className="font-medium">{product.name}</TableCell>
-                          <TableCell>{product.sku}</TableCell>
+                        <TableRow key={product.idProducto}>
+                          <TableCell className="font-medium">{product.nombre}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{product.category}</Badge>
-                          </TableCell>
-                          <TableCell>{product.brand || product.author || "-"}</TableCell>
-                          <TableCell>${product.costPrice.toFixed(2)}</TableCell>
-                          <TableCell>${product.salePrice.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span>{product.stock}</span>
-                              <Badge variant={stockStatus.variant as any} className="text-xs">
-                                {stockStatus.label}
-                              </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={product.status === "active" ? "default" : "secondary"}>
-                              {product.status === "active" ? "Activo" : "Inactivo"}
+                            <Badge variant="outline">
+                              {categoriaNombre}
                             </Badge>
                           </TableCell>
+                          <TableCell>{product.descripcion || "-"}</TableCell>
+                          <TableCell>${product.precio?.toFixed(2) || '0.00'}</TableCell>
                           <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => handleEditProduct(product)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteProduct(product.id)}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteProduct(product.idProducto)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       )
@@ -346,9 +333,7 @@ export default function ProductsPage() {
                 </Table>
               </CardContent>
             </Card>
-          </div>
-        </main>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

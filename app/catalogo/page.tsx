@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { productosService } from "@/lib/services/productos"
 
 type Product = {
   id: number
@@ -12,7 +13,7 @@ type Product = {
   imageUrl: string
   blurDataURL?: string
   author?: string
-  brand?: string 
+  brand?: string
 }
 
 export default function HomePage() {
@@ -33,13 +34,33 @@ export default function HomePage() {
 
   useEffect(() => {
     let mounted = true
-    fetch("/api/products")
-      .then((r) => r.json())
-      .then((data) => {
-        if (mounted) setProducts(data.slice(0, 4)) // Solo mostrar 4 productos destacados
-      })
-      .catch(console.error)
-      .finally(() => mounted && setLoading(false))
+    
+    const loadProducts = async () => {
+      try {
+        const response = await productosService.getProductos()
+        if (response.success && response.data) {
+          // Mapear los productos del backend al formato esperado por el frontend
+          const mappedProducts = response.data.map((producto: any) => ({
+            id: producto.idProducto,
+            name: producto.nombre,
+            category: `Categoría ${producto.idCategoria}`,
+            price: producto.precio,
+            imageUrl: "/placeholder.jpg", // Placeholder hasta que se añadan imágenes
+            author: producto.descripcion || "Sin descripción"
+          }))
+          if (mounted) setProducts(mappedProducts)
+        } else {
+          console.error('Error al cargar productos:', response.message)
+        }
+      } catch (error) {
+        console.error('Error fetching productos:', error)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    loadProducts()
+    
     return () => {
       mounted = false
     }
@@ -139,7 +160,7 @@ export default function HomePage() {
       {/* Featured Products */}
       <section className="py-12">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">Productos Destacados</h2>
+          <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">Productos</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             {products.map((p) => (
               <div key={p.id} className="bg-white p-4 rounded-lg shadow-md border border-gray-200 flex flex-col transition-transform hover:scale-105">
