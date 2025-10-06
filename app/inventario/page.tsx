@@ -38,6 +38,7 @@ export default function InventarioPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Inventario | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Form states
   const [formData, setFormData] = useState({
@@ -127,6 +128,7 @@ export default function InventarioPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
     try {
       const inventoryData: InventarioCreate = {
         idSucursal: parseInt(formData.idSucursal),
@@ -145,16 +147,21 @@ export default function InventarioPage() {
       }
 
       if (result.success) {
-        // Refresh data after successful operation
-        await fetchData()
+        // Cerrar diálogos y resetear formulario
         setIsAddDialogOpen(false)
         setIsEditDialogOpen(false)
         resetForm()
+        // Recargar la página completamente para mostrar los cambios
+        window.location.reload()
       } else {
         console.error("Error:", result.message)
+        // En caso de error, también recargar para limpiar el estado
+        window.location.reload()
       }
     } catch (error) {
       console.error("Error submitting form:", error)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -297,7 +304,16 @@ export default function InventarioPage() {
                   <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit">Agregar</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Procesando...
+                      </>
+                    ) : (
+                      "Agregar"
+                    )}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -529,7 +545,16 @@ export default function InventarioPage() {
                 <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">Actualizar</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Actualizando...
+                    </>
+                  ) : (
+                    "Actualizar"
+                  )}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
