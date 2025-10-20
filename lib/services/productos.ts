@@ -54,7 +54,13 @@ export const productosService = {
                 },
                 body: JSON.stringify(productoData),
             });
-            return await response.json();
+            const data = await response.json();
+            // Si la respuesta es un objeto de producto, asumimos que es exitosa
+            if (data && typeof data === 'object' && data.idProducto) {
+                return { success: true, data };
+            }
+            // De lo contrario, retornamos la data tal cual (debe tener propiedad success)
+            return data;
         } catch (error) {
             console.error('Error creating producto:', error);
             return { success: false, message: 'Error al crear producto' };
@@ -71,7 +77,13 @@ export const productosService = {
                 },
                 body: JSON.stringify(productoData),
             });
-            return await response.json();
+            const data = await response.json();
+            // Si la respuesta es un objeto de producto, asumimos que es exitosa
+            if (data && typeof data === 'object' && data.idProducto) {
+                return { success: true, data };
+            }
+            // De lo contrario, retornamos la data tal cual (debe tener propiedad success)
+            return data;
         } catch (error) {
             console.error('Error updating producto:', error);
             return { success: false, message: 'Error al actualizar producto' };
@@ -84,7 +96,16 @@ export const productosService = {
             const response = await fetch(`${API_BASE_URL}/productos/${id}`, {
                 method: 'DELETE',
             });
-            return await response.json();
+            // Para DELETE, el backend podría no retornar contenido
+            if (response.status === 204 || response.status === 200) {
+                return { success: true, message: 'Producto eliminado correctamente' };
+            }
+            const data = await response.json();
+            // Si hay data, retornamos con éxito
+            if (data) {
+                return { success: true, ...data };
+            }
+            return { success: true, message: 'Producto eliminado correctamente' };
         } catch (error) {
             console.error('Error deleting producto:', error);
             return { success: false, message: 'Error al eliminar producto' };
@@ -129,7 +150,13 @@ export const productosService = {
                 },
                 body: JSON.stringify(categoriaData),
             });
-            return await response.json();
+            const data = await response.json();
+            // Si la respuesta es un objeto de categoría, asumimos que es exitosa
+            if (data && typeof data === 'object' && data.idCategoria) {
+                return { success: true, data };
+            }
+            // De lo contrario, retornamos la data tal cual (debe tener propiedad success)
+            return data;
         } catch (error) {
             console.error('Error creating categoria:', error);
             return { success: false, message: 'Error al crear categoría' };
@@ -146,7 +173,13 @@ export const productosService = {
                 },
                 body: JSON.stringify(categoriaData),
             });
-            return await response.json();
+            const data = await response.json();
+            // Si la respuesta es un objeto de categoría, asumimos que es exitosa
+            if (data && typeof data === 'object' && data.idCategoria) {
+                return { success: true, data };
+            }
+            // De lo contrario, retornamos la data tal cual (debe tener propiedad success)
+            return data;
         } catch (error) {
             console.error('Error updating categoria:', error);
             return { success: false, message: 'Error al actualizar categoría' };
@@ -159,7 +192,16 @@ export const productosService = {
             const response = await fetch(`${API_BASE_URL}/productos/categorias/${id}`, {
                 method: 'DELETE',
             });
-            return await response.json();
+            // Para DELETE, el backend podría no retornar contenido
+            if (response.status === 204 || response.status === 200) {
+                return { success: true, message: 'Categoría eliminada correctamente' };
+            }
+            const data = await response.json();
+            // Si hay data, retornamos con éxito
+            if (data) {
+                return { success: true, ...data };
+            }
+            return { success: true, message: 'Categoría eliminada correctamente' };
         } catch (error) {
             console.error('Error deleting categoria:', error);
             return { success: false, message: 'Error al eliminar categoría' };

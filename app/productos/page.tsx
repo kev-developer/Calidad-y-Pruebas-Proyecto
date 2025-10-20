@@ -28,6 +28,7 @@ import { CategoryManager } from "@/components/category-manager"
 import { productosService } from "@/lib/services/productos"
 import { Producto, Categoria } from "@/lib/models"
 import Swal from "sweetalert2"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Producto[]>([])
@@ -286,25 +287,19 @@ export default function ProductsPage() {
                       />
                     </div>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline">
-                        <Filter className="h-4 w-4 mr-2" />
-                        Categoría: {selectedCategory === "all" ? "Todas" : selectedCategory}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => setSelectedCategory("all")}>
-                        Todas las categorías
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-full md:w-[200px]">
+                      <SelectValue placeholder="Categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las categorías</SelectItem>
                       {categorias.map((categoria) => (
-                        <DropdownMenuItem key={categoria.idCategoria} onClick={() => setSelectedCategory(categoria.nombre)}>
+                        <SelectItem key={categoria.idCategoria} value={categoria.nombre}>
                           {categoria.nombre}
-                        </DropdownMenuItem>
+                        </SelectItem>
                       ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
