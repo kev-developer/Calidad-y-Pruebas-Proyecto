@@ -118,7 +118,13 @@ export const inventarioService = {
                 },
                 body: JSON.stringify(inventarioData),
             });
-            return await response.json();
+            const data = await response.json();
+            // Si la respuesta es un objeto de inventario, asumimos que es exitosa
+            if (data && typeof data === 'object' && data.idInventario) {
+                return { success: true, data };
+            }
+            // De lo contrario, retornamos la data tal cual (debe tener propiedad success)
+            return data;
         } catch (error) {
             console.error('Error creating inventario:', error);
             return { success: false, message: 'Error al crear registro de inventario' };
@@ -135,7 +141,13 @@ export const inventarioService = {
                 },
                 body: JSON.stringify(inventarioData),
             });
-            return await response.json();
+            const data = await response.json();
+            // Si la respuesta es un objeto de inventario, asumimos que es exitosa
+            if (data && typeof data === 'object' && data.idInventario) {
+                return { success: true, data };
+            }
+            // De lo contrario, retornamos la data tal cual (debe tener propiedad success)
+            return data;
         } catch (error) {
             console.error('Error updating inventario:', error);
             return { success: false, message: 'Error al actualizar registro de inventario' };
@@ -148,7 +160,16 @@ export const inventarioService = {
             const response = await fetch(`${API_BASE_URL}/inventario/inventarios/${id}`, {
                 method: 'DELETE',
             });
-            return await response.json();
+            // Para DELETE, el backend podría no retornar contenido
+            if (response.status === 204 || response.status === 200) {
+                return { success: true, message: 'Inventario eliminado correctamente' };
+            }
+            const data = await response.json();
+            // Si hay data, retornamos con éxito
+            if (data) {
+                return { success: true, ...data };
+            }
+            return { success: true, message: 'Inventario eliminado correctamente' };
         } catch (error) {
             console.error('Error deleting inventario:', error);
             return { success: false, message: 'Error al eliminar registro de inventario' };
