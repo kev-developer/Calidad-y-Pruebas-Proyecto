@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Package, Users, ShoppingCart, Truck, BarChart3, Menu, Store, Indent as Inventory } from "lucide-react"
+import { Package, Users, ShoppingCart, Truck, BarChart3, Menu, Store, Gift, Indent as Inventory } from "lucide-react"
 
 const navigation = [
   {
@@ -34,6 +34,11 @@ const navigation = [
     name: "Proveedores",
     href: "/proveedores",
     icon: Truck,
+  },
+  {
+    name: "Combos",
+    href: "/combos",
+    icon: Gift,
   },
   {
     name: "Reportes",

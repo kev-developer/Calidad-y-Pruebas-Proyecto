@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Plus, Search, Truck, Phone, Mail, User, Edit, Trash2 } from "lucide-react"
 import type { Proveedor, ApiResponse } from "@/lib/models"
 import { proveedoresService } from "@/lib/services/proveedores"
+import Swal from "sweetalert2"
 
 export default function ProveedoresPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
@@ -68,39 +69,146 @@ export default function ProveedoresPage() {
     return matchesSearch
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      let data: ApiResponse<Proveedor>
-      if (editingSupplier) {
-        data = await proveedoresService.updateProveedor(editingSupplier.idProveedor, formData)
-      } else {
-        data = await proveedoresService.createProveedor(formData)
-      }
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  
+  // Cerrar cualquier alerta previa antes de comenzar
+  Swal.close()
+  
+  try {
+    let data: ApiResponse<Proveedor>
+    if (editingSupplier) {
+      data = await proveedoresService.updateProveedor(editingSupplier.idProveedor, formData)
+    } else {
+      data = await proveedoresService.createProveedor(formData)
+    }
 
+    if (data.success) {
+      // Cerrar diálogos primero
+      setIsAddDialogOpen(false)
+      setIsEditDialogOpen(false)
+      resetForm()
+      
+      // Esperar un momento para asegurar que los diálogos se cerraron
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Mostrar alerta de éxito
+      await Swal.fire({
+        title: "¡Éxito!",
+        text: editingSupplier ? "Proveedor actualizado correctamente" : "Proveedor creado correctamente",
+        icon: "success",
+        confirmButtonText: "Aceptar",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        focusConfirm: true
+      })
+      
+      await fetchProveedores()
+    } else {
+      // Cerrar diálogos primero
+      setIsAddDialogOpen(false)
+      setIsEditDialogOpen(false)
+      
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Mostrar alerta de error
+      await Swal.fire({
+        title: "Error",
+        text: data.message || "Ha ocurrido un error al guardar el proveedor.",
+        icon: "error",
+        confirmButtonText: "Aceptar",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        focusConfirm: true
+      })
+    }
+  } catch (error) {
+    console.error("Error saving proveedor:", error)
+    
+    // Cerrar diálogos primero
+    setIsAddDialogOpen(false)
+    setIsEditDialogOpen(false)
+    
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Mostrar alerta de error
+    await Swal.fire({
+      title: "Error",
+      text: "Ha ocurrido un error inesperado al guardar el proveedor.",
+      icon: "error",
+      confirmButtonText: "Aceptar",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      focusConfirm: true
+    })
+  }
+}
+
+const handleDelete = async (id: number) => {
+  // Cerrar cualquier alerta previa antes de comenzar
+  Swal.close()
+  
+  // Cerrar diálogos de formulario si están abiertos
+  setIsAddDialogOpen(false)
+  setIsEditDialogOpen(false)
+  
+  // Pequeña pausa para asegurar que los diálogos se cerraron
+  await new Promise(resolve => setTimeout(resolve, 100))
+  
+  const result = await Swal.fire({
+    title: "¿Estás seguro?",
+    text: "¿Estás seguro de que deseas eliminar este proveedor?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Sí, eliminar",
+    cancelButtonText: "Cancelar",
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    focusConfirm: true
+  })
+  
+  if (result.isConfirmed) {
+    try {
+      const data = await proveedoresService.deleteProveedor(id)
       if (data.success) {
+        // Mostrar alerta de éxito
+        await Swal.fire({
+          title: "¡Eliminado!",
+          text: "El proveedor ha sido eliminado correctamente",
+          icon: "success",
+          confirmButtonText: "Aceptar",
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          focusConfirm: true
+        })
         await fetchProveedores()
-        setIsAddDialogOpen(false)
-        setIsEditDialogOpen(false)
-        resetForm()
+      } else {
+        // Mostrar alerta de error
+        await Swal.fire({
+          title: "Error",
+          text: data.message || "Ha ocurrido un error al eliminar el proveedor.",
+          icon: "error",
+          confirmButtonText: "Aceptar",
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          focusConfirm: true
+        })
       }
     } catch (error) {
-      console.error("Error saving proveedor:", error)
+      console.error("Error deleting proveedor:", error)
+      // Mostrar alerta de error
+      await Swal.fire({
+        title: "Error",
+        text: "Ha ocurrido un error inesperado al eliminar el proveedor.",
+        icon: "error",
+        confirmButtonText: "Aceptar",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        focusConfirm: true
+      })
     }
   }
-
-  const handleDelete = async (id: number) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este proveedor?")) {
-      try {
-        const data = await proveedoresService.deleteProveedor(id)
-        if (data.success) {
-          await fetchProveedores()
-        }
-      } catch (error) {
-        console.error("Error deleting proveedor:", error)
-      }
-    }
-  }
+}
 
   const resetForm = () => {
     setFormData({

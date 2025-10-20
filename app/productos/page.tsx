@@ -27,6 +27,7 @@ import { ProductForm } from "@/components/product-form"
 import { CategoryManager } from "@/components/category-manager"
 import { productosService } from "@/lib/services/productos"
 import { Producto, Categoria } from "@/lib/models"
+import Swal from "sweetalert2"
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Producto[]>([])
@@ -90,16 +91,43 @@ export default function ProductsPage() {
   }
 
   const handleDeleteProduct = async (productId: number) => {
-    try {
-      const response = await productosService.deleteProducto(productId)
-      if (response.success) {
-        setProducts(products.filter((p) => p.idProducto !== productId))
-      } else {
-        throw new Error(response.message || 'Error al eliminar producto')
+    const product = products.find(p => p.idProducto === productId)
+    const result = await Swal.fire({
+      title: "¿Estás seguro?",
+      text: `¿Estás seguro de que deseas eliminar el producto "${product?.nombre}"?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar"
+    })
+    
+    if (result.isConfirmed) {
+      try {
+        const response = await productosService.deleteProducto(productId)
+        if (response.success) {
+          // Mostrar alerta de éxito
+          await Swal.fire({
+            title: "¡Eliminado!",
+            text: "El producto ha sido eliminado correctamente",
+            icon: "success",
+            confirmButtonText: "Aceptar"
+          })
+          setProducts(products.filter((p) => p.idProducto !== productId))
+        } else {
+          throw new Error(response.message || 'Error al eliminar producto')
+        }
+      } catch (err) {
+        console.error('Error deleting product:', err)
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido al eliminar producto'
+        setError(errorMessage)
+        // Mostrar alerta de error
+        await Swal.fire({
+          title: "Error",
+          text: errorMessage,
+          icon: "error",
+          confirmButtonText: "Aceptar"
+        })
       }
-    } catch (err) {
-      console.error('Error deleting product:', err)
-      setError(err instanceof Error ? err.message : 'Error desconocido al eliminar producto')
     }
   }
 

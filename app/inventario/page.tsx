@@ -24,6 +24,7 @@ import { Plus, Search, AlertTriangle, Package, Edit, Trash2 } from "lucide-react
 import type { Inventario, Producto, Categoria, ApiResponse, InventarioCreate, Sucursal } from "@/lib/models"
 import { inventarioService } from "@/lib/services/inventario"
 import { productosService } from "@/lib/services/productos"
+import Swal from "sweetalert2"
 
 export default function InventarioPage() {
   const [inventario, setInventario] = useState<Inventario[]>([])
@@ -62,8 +63,6 @@ export default function InventarioPage() {
         productosService.getCategorias(),
         inventarioService.getSucursales(),
       ])
-
-
 
       if (inventarioData.success && inventarioData.data) {
         setInventario(inventarioData.data)
@@ -147,19 +146,50 @@ export default function InventarioPage() {
       }
 
       if (result.success) {
-        // Cerrar diálogos y resetear formulario
+        // ✅ CAMBIO IMPORTANTE: Cerrar primero los diálogos ANTES de mostrar SweetAlert
         setIsAddDialogOpen(false)
         setIsEditDialogOpen(false)
         resetForm()
-        // Recargar la página completamente para mostrar los cambios
-        window.location.reload()
+        
+        // Mostrar SweetAlert después de cerrar los diálogos
+        await Swal.fire({
+          title: "¡Éxito!",
+          text: editingItem ? "Inventario actualizado correctamente" : "Producto agregado al inventario correctamente",
+          icon: "success",
+          confirmButtonText: "Aceptar"
+        })
+        
+        // Recargar datos sin refrescar la página completa
+        await fetchData()
       } else {
-        console.error("Error:", result.message)
-        // En caso de error, también recargar para limpiar el estado
-        window.location.reload()
+        // ✅ CAMBIO: Cerrar diálogos antes de mostrar error
+        setIsAddDialogOpen(false)
+        setIsEditDialogOpen(false)
+        
+        await Swal.fire({
+          title: "Error",
+          text: result.message || "Ha ocurrido un error al guardar el inventario.",
+          icon: "error",
+          confirmButtonText: "Aceptar"
+        })
+        
+        // Recargar para limpiar estado
+        await fetchData()
       }
     } catch (error) {
       console.error("Error submitting form:", error)
+      // ✅ CAMBIO: Cerrar diálogos antes de mostrar error
+      setIsAddDialogOpen(false)
+      setIsEditDialogOpen(false)
+      
+      await Swal.fire({
+        title: "Error",
+        text: "Ha ocurrido un error inesperado al guardar el inventario.",
+        icon: "error",
+        confirmButtonText: "Aceptar"
+      })
+      
+      await fetchData()
     } finally {
       setIsSubmitting(false)
     }
@@ -187,19 +217,45 @@ export default function InventarioPage() {
   }
 
   const handleDelete = async (item: Inventario) => {
-    if (window.confirm(`¿Estás seguro de que deseas eliminar el inventario de ${item.producto?.nombre}?`)) {
+    // ✅ CAMBIO: Usar SweetAlert2 en lugar de window.confirm
+    const result = await Swal.fire({
+      title: "¿Estás seguro?",
+      text: `¿Estás seguro de que deseas eliminar el inventario de ${item.producto?.nombre}?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+      focusCancel: true // ✅ NUEVO: Enfocar el botón de cancelar por seguridad
+    })
+    
+    if (result.isConfirmed) {
       try {
         const result = await inventarioService.deleteInventario(item.idInventario)
         if (result.success) {
+          await Swal.fire({
+            title: "¡Eliminado!",
+            text: "El inventario ha sido eliminado correctamente",
+            icon: "success",
+            confirmButtonText: "Aceptar"
+          })
           // Refresh data after successful deletion
           await fetchData()
         } else {
-          console.error("Error deleting inventario:", result.message)
-          alert("Error al eliminar el inventario: " + result.message)
+          await Swal.fire({
+            title: "Error",
+            text: result.message || "Ha ocurrido un error al eliminar el inventario.",
+            icon: "error",
+            confirmButtonText: "Aceptar"
+          })
         }
       } catch (error) {
         console.error("Error deleting inventario:", error)
-        alert("Error al eliminar el inventario")
+        await Swal.fire({
+          title: "Error",
+          text: "Ha ocurrido un error inesperado al eliminar el inventario.",
+          icon: "error",
+          confirmButtonText: "Aceptar"
+        })
       }
     }
   }

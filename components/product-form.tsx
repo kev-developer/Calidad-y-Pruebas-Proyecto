@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import Swal from "sweetalert2"
 
 interface ProductFormData {
   nombre: string
@@ -101,14 +102,36 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
       })
 
       if (response.ok) {
+        // Mostrar alerta de éxito
+        await Swal.fire({
+          title: "¡Éxito!",
+          text: product ? "Producto actualizado correctamente" : "Producto creado correctamente",
+          icon: "success",
+          confirmButtonText: "Aceptar"
+        })
+        
         onClose()
         // Recargar la página o actualizar la lista de productos
         window.location.reload()
       } else {
         console.error("Error al guardar el producto")
+        // Mostrar alerta de error
+        await Swal.fire({
+          title: "Error",
+          text: "Ha ocurrido un error al guardar el producto",
+          icon: "error",
+          confirmButtonText: "Aceptar"
+        })
       }
     } catch (error) {
       console.error("Error:", error)
+      // Mostrar alerta de error
+      await Swal.fire({
+        title: "Error",
+        text: "Ha ocurrido un error inesperado",
+        icon: "error",
+        confirmButtonText: "Aceptar"
+      })
     }
   }
 

@@ -23,14 +23,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Users, Star, Edit, Trash2, Mail, CreditCard } from "lucide-react"
 import type { Cliente, ApiResponse } from "@/lib/models"
 import { clientesService } from "@/lib/services/clientes"
-import { useToast } from "@/components/ui/use-toast"
+import Swal from "sweetalert2"
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
-  const { toast } = useToast()
 
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -104,57 +103,78 @@ export default function ClientesPage() {
       }
 
       if (data.success) {
-        toast({
-          title: editingClient ? "Cliente actualizado" : "Cliente creado",
-          description: editingClient ? "El cliente ha sido actualizado correctamente." : "El cliente ha sido creado correctamente.",
-          variant: "default",
+        // Mostrar alerta de éxito
+        await Swal.fire({
+          title: "¡Éxito!",
+          text: editingClient ? "Cliente actualizado correctamente" : "Cliente creado correctamente",
+          icon: "success",
+          confirmButtonText: "Aceptar"
         })
         await fetchClientes()
         setIsAddDialogOpen(false)
         setIsEditDialogOpen(false)
         resetForm()
       } else {
-        toast({
+        // Mostrar alerta de error
+        await Swal.fire({
           title: "Error",
-          description: data.message || "Ha ocurrido un error al guardar el cliente.",
-          variant: "destructive",
+          text: data.message || "Ha ocurrido un error al guardar el cliente.",
+          icon: "error",
+          confirmButtonText: "Aceptar"
         })
       }
     } catch (error) {
       console.error("Error saving cliente:", error)
-      toast({
+      // Mostrar alerta de error
+      await Swal.fire({
         title: "Error",
-        description: "Ha ocurrido un error inesperado al guardar el cliente.",
-        variant: "destructive",
+        text: "Ha ocurrido un error inesperado al guardar el cliente.",
+        icon: "error",
+        confirmButtonText: "Aceptar"
       })
     }
   }
 
   const handleDelete = async (id: number) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este cliente?")) {
+    const result = await Swal.fire({
+      title: "¿Estás seguro?",
+      text: "¿Estás seguro de que deseas eliminar este cliente?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar"
+    })
+    
+    if (result.isConfirmed) {
       try {
         const data = await clientesService.deleteCliente(id)
 
         if (data.success) {
-          toast({
-            title: "Cliente eliminado",
-            description: "El cliente ha sido eliminado correctamente.",
-            variant: "default",
+          // Mostrar alerta de éxito
+          await Swal.fire({
+            title: "¡Eliminado!",
+            text: "El cliente ha sido eliminado correctamente",
+            icon: "success",
+            confirmButtonText: "Aceptar"
           })
           await fetchClientes()
         } else {
-          toast({
+          // Mostrar alerta de error
+          await Swal.fire({
             title: "Error",
-            description: data.message || "Ha ocurrido un error al eliminar el cliente.",
-            variant: "destructive",
+            text: data.message || "Ha ocurrido un error al eliminar el cliente.",
+            icon: "error",
+            confirmButtonText: "Aceptar"
           })
         }
       } catch (error) {
         console.error("Error deleting cliente:", error)
-        toast({
+        // Mostrar alerta de error
+        await Swal.fire({
           title: "Error",
-          description: "Ha ocurrido un error inesperado al eliminar el cliente.",
-          variant: "destructive",
+          text: "Ha ocurrido un error inesperado al eliminar el cliente.",
+          icon: "error",
+          confirmButtonText: "Aceptar"
         })
       }
     }
