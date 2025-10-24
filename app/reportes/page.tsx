@@ -70,12 +70,21 @@ export default function ReportesPage() {
         if (statsResponse.success && statsResponse.data) {
           setDashboardStats(statsResponse.data)
           // Use monthly sales data for charts
-          setSalesData(statsResponse.data.ventasMes.map((item: any) => ({
+          // Procesar datos de ventas mensuales
+          const ventasMesData = statsResponse.data.ventasMes || [];
+          setSalesData(ventasMesData.map((item: any) => ({
             name: item.mes,
-            ventas: item.total,
-            costos: item.total * 0.7 // Assuming 70% cost for demonstration
+            ventas: item.total || 0,
+            costos: (item.total || 0) * 0.7 // Assuming 70% cost for demonstration
           })))
-          setTopProducts(statsResponse.data.topProductos.slice(0, 5))
+          
+          // Procesar productos más vendidos
+          const topProductosData = statsResponse.data.topProductos || [];
+          setTopProducts(topProductosData.slice(0, 5).map((producto: any) => ({
+            name: producto.producto?.nombre || `Producto ${producto.producto?.idProducto}`,
+            sales: producto.cantidadVendida || 0,
+            revenue: producto.totalVentas || 0
+          })))
         } else {
           throw new Error(statsResponse.message || 'Error al cargar estadísticas')
         }
@@ -85,7 +94,12 @@ export default function ReportesPage() {
         }
 
         if (customersResponse.success && customersResponse.data) {
-          setTopCustomers(customersResponse.data.slice(0, 5))
+          const topCustomersData = customersResponse.data.slice(0, 5);
+          setTopCustomers(topCustomersData.map((customer: any) => ({
+            name: customer.name,
+            purchases: customer.purchases || 0,
+            total: customer.total || 0
+          })))
         }
 
         // Use real category data instead of placeholders
@@ -340,20 +354,26 @@ export default function ReportesPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {topProducts.map((product, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-bold text-blue-600">{index + 1}</span>
+                  {topProducts.length > 0 ? (
+                    topProducts.map((product, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-bold text-blue-600">{index + 1}</span>
+                          </div>
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-sm text-slate-600">{product.sales} unidades</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{product.name}</p>
-                          <p className="text-sm text-slate-600">{product.sales} unidades</p>
-                        </div>
+                        <p className="font-semibold text-emerald-600">${product.revenue.toLocaleString()}</p>
                       </div>
-                      <p className="font-semibold text-emerald-600">${product.revenue.toLocaleString()}</p>
+                    ))
+                  ) : (
+                    <div className="text-center p-4 text-slate-500">
+                      No hay datos de productos vendidos
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -364,19 +384,25 @@ export default function ReportesPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {inventoryAlerts.map((alert, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{alert.product}</p>
-                        <p className="text-sm text-slate-600">
-                          Stock: {alert.stock} / Mínimo: {alert.minStock}
-                        </p>
+                  {inventoryAlerts.length > 0 ? (
+                    inventoryAlerts.map((alert, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{alert.product}</p>
+                          <p className="text-sm text-slate-600">
+                            Stock: {alert.stock} / Mínimo: {alert.minStock}
+                          </p>
+                        </div>
+                        <Badge className={getStatusColor(alert.status)}>
+                          {alert.status === "critical" ? "Crítico" : "Bajo"}
+                        </Badge>
                       </div>
-                      <Badge className={getStatusColor(alert.status)}>
-                        {alert.status === "critical" ? "Crítico" : "Bajo"}
-                      </Badge>
+                    ))
+                  ) : (
+                    <div className="text-center p-4 text-slate-500">
+                      No hay alertas de inventario
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -444,18 +470,24 @@ export default function ReportesPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {topProducts.map((product, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-slate-600">Vendidos: {product.sales}</p>
+                  {topProducts.length > 0 ? (
+                    topProducts.map((product, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{product.name}</p>
+                          <p className="text-sm text-slate-600">Vendidos: {product.sales}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">Rotación: {(product.sales > 0 ? (product.sales / 30).toFixed(1) : '0.0')}x</p>
+                          <p className="text-sm text-slate-600">Stock: {product.sales > 0 ? Math.round(30 / (product.sales / 30)) : 'N/A'} días</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">Rotación: 8.5x</p>
-                        <p className="text-sm text-slate-600">Stock: 45 días</p>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center p-4 text-slate-500">
+                      No hay datos de rotación de inventario
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -468,32 +500,32 @@ export default function ReportesPage() {
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm text-slate-600">Valor Total</p>
                   <p className="text-2xl font-bold text-slate-800">
-                    ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales / 1000000).toFixed(1) + 'M' : '0'}
+                    ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales / 1000).toFixed(1) + 'K' : '0'}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 bg-emerald-50 rounded-lg">
                     <p className="text-sm text-emerald-700">Escolares</p>
                     <p className="text-lg font-bold text-emerald-800">
-                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.35 / 1000000).toFixed(1) + 'M' : '0'}
+                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.35 / 1000).toFixed(1) + 'K' : '0'}
                     </p>
                   </div>
                   <div className="p-3 bg-blue-50 rounded-lg">
                     <p className="text-sm text-blue-700">Útiles</p>
                     <p className="text-lg font-bold text-blue-800">
-                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.30 / 1000000).toFixed(1) + 'M' : '0'}
+                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.30 / 1000).toFixed(1) + 'K' : '0'}
                     </p>
                   </div>
                   <div className="p-3 bg-orange-50 rounded-lg">
                     <p className="text-sm text-orange-700">Arte</p>
                     <p className="text-lg font-bold text-orange-800">
-                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.20 / 1000000).toFixed(1) + 'M' : '0'}
+                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.20 / 1000).toFixed(1) + 'K' : '0'}
                     </p>
                   </div>
                   <div className="p-3 bg-purple-50 rounded-lg">
                     <p className="text-sm text-purple-700">Oficina</p>
                     <p className="text-lg font-bold text-purple-800">
-                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.15 / 1000000).toFixed(1) + 'M' : '0'}
+                      ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales * 0.15 / 1000).toFixed(1) + 'K' : '0'}
                     </p>
                   </div>
                 </div>
@@ -510,20 +542,26 @@ export default function ReportesPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {topCustomers.map((customer, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-bold text-blue-600">{index + 1}</span>
+                  {topCustomers.length > 0 ? (
+                    topCustomers.map((customer, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-bold text-blue-600">{index + 1}</span>
+                          </div>
+                          <div>
+                            <p className="font-medium">{customer.name}</p>
+                            <p className="text-sm text-slate-600">{customer.purchases} compras</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{customer.name}</p>
-                          <p className="text-sm text-slate-600">{customer.purchases} compras</p>
-                        </div>
+                        <p className="font-semibold text-emerald-600">${customer.total.toLocaleString()}</p>
                       </div>
-                      <p className="font-semibold text-emerald-600">${customer.total.toLocaleString()}</p>
+                    ))
+                  ) : (
+                    <div className="text-center p-4 text-slate-500">
+                      No hay datos de clientes
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -577,7 +615,7 @@ export default function ReportesPage() {
                 <div className="p-4 bg-emerald-50 rounded-lg">
                   <p className="text-sm text-emerald-700">Ingresos Totales</p>
                   <p className="text-2xl font-bold text-emerald-800">
-                    ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales / 1000000).toFixed(1) + 'M' : '0'}
+                    ${dashboardStats?.financialMetrics?.ingresosTotales ? (dashboardStats.financialMetrics.ingresosTotales / 1000).toFixed(1) + 'K' : '0'}
                   </p>
                   <p className="text-xs text-emerald-600">
                     {dashboardStats?.financialMetrics?.crecimiento ? '+' + dashboardStats.financialMetrics.crecimiento.toFixed(1) + '% vs mes anterior' : 'Sin datos'}
@@ -586,7 +624,7 @@ export default function ReportesPage() {
                 <div className="p-4 bg-red-50 rounded-lg">
                   <p className="text-sm text-red-700">Costos Totales</p>
                   <p className="text-2xl font-bold text-red-800">
-                    ${dashboardStats?.financialMetrics?.costosTotales ? (dashboardStats.financialMetrics.costosTotales / 1000000).toFixed(1) + 'M' : '0'}
+                    ${dashboardStats?.financialMetrics?.costosTotales ? (dashboardStats.financialMetrics.costosTotales / 1000).toFixed(1) + 'K' : '0'}
                   </p>
                   <p className="text-xs text-red-600">
                     {dashboardStats?.financialMetrics?.crecimiento ? '+' + (dashboardStats.financialMetrics.crecimiento * 0.65).toFixed(1) + '% vs mes anterior' : 'Sin datos'}
@@ -616,7 +654,7 @@ export default function ReportesPage() {
                     <YAxis />
                     <Tooltip />
                     <Line type="monotone" dataKey="ventas" stroke="#10b981" strokeWidth={2} name="Ingresos" />
-                    <Line type="monotone" dataKey="costos" stroke="#ef4444" strokeWidth={2} name="Egresos" />
+                    <Line type="monotone" dataKey="costos" stroke="#ef4444" strokeWidth={2} name="Costos" />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>

@@ -2,16 +2,19 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/ui/dashboard-layout"
+import { ProtectedRoute } from "@/components/protected-route"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TrendingUp, ShoppingCart, DollarSign, Users, Calendar, Search, Download, BarChart3 } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { TrendingUp, ShoppingCart, DollarSign, Users, Calendar, Search, Download, BarChart3, Plus } from "lucide-react"
 import type { Venta, Cliente, ApiResponse } from "@/lib/models"
 import { ventasService } from "@/lib/services/ventas"
 import { clientesService } from "@/lib/services/clientes"
+import { VentaForm } from "@/components/venta-form"
 
 export default function VentasPage() {
   const [ventas, setVentas] = useState<Venta[]>([])
@@ -20,6 +23,7 @@ export default function VentasPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterPeriod, setFilterPeriod] = useState<string>("all")
   const [filterUser, setFilterUser] = useState<string>("all")
+  const [isVentaFormOpen, setIsVentaFormOpen] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -58,14 +62,16 @@ export default function VentasPage() {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Cargando análisis de ventas...</p>
+      <ProtectedRoute>
+        <DashboardLayout>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-2 text-muted-foreground">Cargando análisis de ventas...</p>
+            </div>
           </div>
-        </div>
-      </DashboardLayout>
+        </DashboardLayout>
+      </ProtectedRoute>
     )
   }
 
@@ -74,8 +80,9 @@ export default function VentasPage() {
   const promedioVenta = totalVentas / ventas.length || 0
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <ProtectedRoute>
+      <DashboardLayout>
+        <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -83,6 +90,29 @@ export default function VentasPage() {
             <p className="text-muted-foreground">Reportes y estadísticas de ventas</p>
           </div>
           <div className="flex gap-2">
+            <Dialog open={isVentaFormOpen} onOpenChange={setIsVentaFormOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Venta
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Nueva Venta</DialogTitle>
+                  <DialogDescription>
+                    Complete la información para procesar una nueva venta con descuento automático de inventario
+                  </DialogDescription>
+                </DialogHeader>
+                <VentaForm
+                  onSuccess={() => {
+                    setIsVentaFormOpen(false)
+                    fetchData() // Recargar las ventas
+                  }}
+                  onCancel={() => setIsVentaFormOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
             <Button variant="outline">
               <Download className="h-4 w-4 mr-2" />
               Exportar
@@ -235,7 +265,8 @@ export default function VentasPage() {
             </Table>
           </CardContent>
         </Card>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </ProtectedRoute>
   )
 }

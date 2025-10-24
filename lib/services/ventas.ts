@@ -1,4 +1,5 @@
 import { ApiResponse, Venta, DetalleVenta, DetalleVentaCreate } from '@/lib/models';
+import { fetchWithAuth } from './auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -6,7 +7,7 @@ export const ventasService = {
     // Listar todas las ventas
     async getVentas(): Promise<ApiResponse<Venta[]>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/ventas/`);
+            const response = await fetchWithAuth(`${API_BASE_URL}/ventas/`);
             const data = await response.json();
 
             // Si la respuesta es un array, asumimos que es exitosa
@@ -24,7 +25,7 @@ export const ventasService = {
     // Obtener venta por ID
     async getVentaById(id: number): Promise<ApiResponse<Venta>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/ventas/${id}`);
+            const response = await fetchWithAuth(`${API_BASE_URL}/ventas/${id}`);
             return await response.json();
         } catch (error) {
             console.error('Error fetching venta:', error);
@@ -35,11 +36,8 @@ export const ventasService = {
     // Crear nueva venta
     async createVenta(ventaData: Omit<Venta, 'idVenta'>): Promise<ApiResponse<Venta>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/ventas/`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/ventas/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(ventaData),
             });
             return await response.json();
@@ -49,14 +47,61 @@ export const ventasService = {
         }
     },
 
-    // Actualizar venta
-    async updateVenta(id: number, ventaData: Partial<Venta>): Promise<ApiResponse<Venta>> {
+    // Crear venta completa con manejo de inventario
+    async createVentaCompleta(ventaData: {
+        venta_data: {
+            idCliente: number;
+            idUsuario: number;
+            idSucursal: number;
+            total: number;
+        };
+        detalles: Array<{
+            idProducto: number;
+            cantidad: number;
+            precioUnitario: number;
+            descuentoAplicado?: number;
+        }>;
+    }): Promise<ApiResponse<{
+        venta: Venta;
+        detalles: DetalleVenta[];
+        message: string;
+    }>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/ventas/${id}`, {
-                method: 'PUT',
+            console.log('Enviando datos de venta:', JSON.stringify(ventaData, null, 2));
+
+            const response = await fetchWithAuth(`${API_BASE_URL}/ventas/completa`, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                body: JSON.stringify(ventaData),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error('Error del backend - Status:', response.status, 'Data:', data);
+                return {
+                    success: false,
+                    message: data.detail || `Error HTTP ${response.status} al procesar la venta`
+                };
+            }
+
+            return { success: true, data };
+        } catch (error) {
+            console.error('Error creating venta completa:', error);
+            return {
+                success: false,
+                message: 'Error de conexión al procesar la venta'
+            };
+        }
+    },
+
+    // Actualizar venta
+    async updateVenta(id: number, ventaData: Partial<Venta>): Promise<ApiResponse<Venta>> {
+        try {
+            const response = await fetchWithAuth(`${API_BASE_URL}/ventas/${id}`, {
+                method: 'PUT',
                 body: JSON.stringify(ventaData),
             });
             return await response.json();
@@ -69,7 +114,7 @@ export const ventasService = {
     // Eliminar venta
     async deleteVenta(id: number): Promise<ApiResponse<null>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/ventas/${id}`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/ventas/${id}`, {
                 method: 'DELETE',
             });
             return await response.json();
@@ -82,8 +127,7 @@ export const ventasService = {
     // Obtener detalles de venta
     async getVentaDetalles(id: number): Promise<ApiResponse<DetalleVenta[]>> {
         try {
-
-            const response = await fetch(`${API_BASE_URL}/ventas/${id}/detalles`);
+            const response = await fetchWithAuth(`${API_BASE_URL}/ventas/${id}/detalles`);
 
             if (!response.ok) {
                 console.error(`HTTP error! status: ${response.status} for venta ID: ${id}`);
@@ -92,16 +136,13 @@ export const ventasService = {
 
             const data = await response.json();
 
-
             // Si la respuesta es un array, asumimos que es exitosa (formato directo del backend)
             if (Array.isArray(data)) {
-
                 return { success: true, data };
             }
 
             // Si es un objeto con propiedad success, retornamos tal cual
             if (data && typeof data === 'object' && 'success' in data) {
-
                 return data;
             }
 
@@ -116,11 +157,8 @@ export const ventasService = {
     // Agregar detalle a venta
     async addVentaDetalle(id: number, detalleData: DetalleVentaCreate): Promise<ApiResponse<DetalleVenta>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/ventas/${id}/detalles`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/ventas/${id}/detalles`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(detalleData),
             });
             return await response.json();

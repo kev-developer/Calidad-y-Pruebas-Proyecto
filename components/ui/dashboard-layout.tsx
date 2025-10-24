@@ -2,13 +2,16 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { BarChart3, Package, Users, Truck, ShoppingCart, Menu, Home, Settings, LogOut, FileText, Tags } from "lucide-react"
+import { authService } from "@/lib/services/auth"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { bytesToImageUrl } from "@/lib/utils"
 
 const navigation = [
   {
@@ -54,7 +57,23 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [user, setUser] = useState<any>(null)
   const pathname = usePathname()
+  const router = useRouter()
+
+  useEffect(() => {
+    const checkAuth = () => {
+      const storedUser = authService.getStoredUser()
+      setUser(storedUser)
+    }
+
+    checkAuth()
+  }, [])
+
+  const handleLogout = () => {
+    authService.logout()
+    router.push('/catalogo')
+  }
 
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <div className={cn("flex h-full flex-col", mobile ? "w-full" : "w-64")}>
@@ -94,12 +113,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* User section */}
       <div className="border-t border-sidebar-border bg-sidebar p-4">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent">
-            <span className="text-sm font-medium text-sidebar-accent-foreground">JD</span>
-          </div>
+          <Avatar className="h-8 w-8">
+            <AvatarImage
+              src={user?.foto_perfil ? bytesToImageUrl(user.foto_perfil) || undefined : undefined}
+              alt={user?.nombre || 'Usuario'}
+            />
+            <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-sm">
+              {user?.nombre ? user.nombre.charAt(0).toUpperCase() : 'U'}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground">Juan Pérez</p>
-            <p className="text-xs text-sidebar-foreground/60">Administrador</p>
+            <p className="text-sm font-medium text-sidebar-foreground">{user?.nombre || 'Usuario'}</p>
+            <p className="text-xs text-sidebar-foreground/60">
+              {user?.idRol === 2 ? 'Cliente' : user?.idRol === 1 ? 'Administrador' : 'Usuario'}
+            </p>
           </div>
         </div>
         <div className="mt-2 flex gap-2">
@@ -107,11 +134,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             variant="ghost"
             size="sm"
             className="flex-1 justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent"
+            onClick={() => router.push('/perfil')}
           >
             <Settings className="h-4 w-4" />
             Configuración
           </Button>
-          <Button variant="ghost" size="sm" className="text-sidebar-foreground hover:bg-sidebar-accent">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-sidebar-foreground hover:bg-sidebar-accent"
+            onClick={handleLogout}
+          >
             <LogOut className="h-4 w-4" />
           </Button>
         </div>

@@ -3,7 +3,9 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { DashboardLayout } from "@/components/ui/dashboard-layout"
+import { ProtectedRoute } from "@/components/protected-route"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,7 +22,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, AlertTriangle, Package, Edit, Trash2 } from "lucide-react"
+import { Plus, Search, AlertTriangle, Package, Edit, Trash2, History } from "lucide-react"
 import type { Inventario, Producto, Categoria, ApiResponse, InventarioCreate, Sucursal } from "@/lib/models"
 import { inventarioService } from "@/lib/services/inventario"
 import { productosService } from "@/lib/services/productos"
@@ -113,15 +115,16 @@ export default function InventarioPage() {
     const matchesCategory = filterCategory === "all" || item.producto?.idCategoria?.toString() === filterCategory
     const matchesStock =
       filterStock === "all" ||
-      (filterStock === "low" && item.stock <= item.stockMinimo) ||
-      (filterStock === "normal" && item.stock > item.stockMinimo)
+      (filterStock === "low" && item.stock > 0 && item.stock <= item.stockMinimo) ||
+      (filterStock === "normal" && item.stock > item.stockMinimo) ||
+      (filterStock === "out" && item.stock === 0)
 
     return matchesSearch && matchesCategory && matchesStock
   })
 
   const getStockStatus = (stock: number, stockMinimo: number) => {
     if (stock === 0) return { label: "Sin Stock", variant: "destructive" as const }
-    if (stock <= stockMinimo) return { label: "Stock Bajo", variant: "secondary" as const }
+    if (stock > 0 && stock <= stockMinimo) return { label: "Stock Bajo", variant: "secondary" as const }
     return { label: "En Stock", variant: "default" as const }
   }
 
@@ -136,59 +139,110 @@ export default function InventarioPage() {
         stockMinimo: parseInt(formData.stockMinimo) || 0,
       }
 
-      let result: ApiResponse<Inventario>
-      if (editingItem) {
-        // Update existing inventory
-        result = await inventarioService.updateInventario(editingItem.idInventario, inventoryData)
-      } else {
-        // Create new inventory
-        result = await inventarioService.createInventario(inventoryData)
-      }
+      // Verificar duplicados solo cuando no estemos editando
+      if (!editingItem) {
+        const duplicate = inventario.find(
+          (item) =>
+            item.idProducto === inventoryData.idProducto &&
+            item.idSucursal === inventoryData.idSucursal
+        )
 
-      if (result.success) {
-        // ✅ CAMBIO IMPORTANTE: Cerrar primero los diálogos ANTES de mostrar SweetAlert
-        setIsAddDialogOpen(false)
-        setIsEditDialogOpen(false)
-        resetForm()
-        
-        // Mostrar SweetAlert después de cerrar los diálogos
-        await Swal.fire({
-          title: "¡Éxito!",
-          text: editingItem ? "Inventario actualizado correctamente" : "Producto agregado al inventario correctamente",
-          icon: "success",
-          confirmButtonText: "Aceptar"
-        })
-        
-        // Recargar datos sin refrescar la página completa
-        await fetchData()
+        if (duplicate) {
+          // Mostrar confirmación para actualizar
+          const result = await Swal.fire({
+            title: "Producto encontrado",
+            text: `Ya existe un registro para "${duplicate.producto?.nombre}" en la sucursal "${duplicate.sucursal?.nombre}". ¿Deseas actualizar los valores?`,
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "Sí, actualizar",
+            cancelButtonText: "Cancelar",
+            focusCancel: true
+          })
+
+          if (result.isConfirmed) {
+            // Actualizar el registro existente
+            const updateResult = await inventarioService.updateInventario(duplicate.idInventario, inventoryData)
+            if (updateResult.success) {
+              setIsAddDialogOpen(false)
+              resetForm()
+              await Swal.fire({
+                title: "¡Actualizado!",
+                text: "El inventario ha sido actualizado correctamente",
+                icon: "success",
+                confirmButtonText: "Aceptar"
+              })
+              await fetchData()
+            } else {
+              await Swal.fire({
+                title: "Error",
+                text: updateResult.message || "Error al actualizar el inventario",
+                icon: "error",
+                confirmButtonText: "Aceptar"
+              })
+            }
+          } else {
+            // Cancelar la operación
+            setIsSubmitting(false)
+            return
+          }
+        } else {
+          // No hay duplicado, crear nuevo
+          const result = await inventarioService.createInventario(inventoryData)
+          if (result.success) {
+            setIsAddDialogOpen(false)
+            resetForm()
+            await Swal.fire({
+              title: "¡Éxito!",
+              text: "Producto agregado al inventario correctamente",
+              icon: "success",
+              confirmButtonText: "Aceptar"
+            })
+            await fetchData()
+          } else {
+            setIsAddDialogOpen(false)
+            await Swal.fire({
+              title: "Error",
+              text: result.message || "Ha ocurrido un error al guardar el inventario.",
+              icon: "error",
+              confirmButtonText: "Aceptar"
+            })
+            await fetchData()
+          }
+        }
       } else {
-        // ✅ CAMBIO: Cerrar diálogos antes de mostrar error
-        setIsAddDialogOpen(false)
-        setIsEditDialogOpen(false)
-        
-        await Swal.fire({
-          title: "Error",
-          text: result.message || "Ha ocurrido un error al guardar el inventario.",
-          icon: "error",
-          confirmButtonText: "Aceptar"
-        })
-        
-        // Recargar para limpiar estado
-        await fetchData()
+        // Estamos editando, actualizar normalmente
+        const result = await inventarioService.updateInventario(editingItem.idInventario, inventoryData)
+        if (result.success) {
+          setIsEditDialogOpen(false)
+          resetForm()
+          await Swal.fire({
+            title: "¡Éxito!",
+            text: "Inventario actualizado correctamente",
+            icon: "success",
+            confirmButtonText: "Aceptar"
+          })
+          await fetchData()
+        } else {
+          setIsEditDialogOpen(false)
+          await Swal.fire({
+            title: "Error",
+            text: result.message || "Ha ocurrido un error al guardar el inventario.",
+            icon: "error",
+            confirmButtonText: "Aceptar"
+          })
+          await fetchData()
+        }
       }
     } catch (error) {
       console.error("Error submitting form:", error)
-      // ✅ CAMBIO: Cerrar diálogos antes de mostrar error
       setIsAddDialogOpen(false)
       setIsEditDialogOpen(false)
-      
       await Swal.fire({
         title: "Error",
         text: "Ha ocurrido un error inesperado al guardar el inventario.",
         icon: "error",
         confirmButtonText: "Aceptar"
       })
-      
       await fetchData()
     } finally {
       setIsSubmitting(false)
@@ -262,119 +316,130 @@ export default function InventarioPage() {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Cargando inventario...</p>
+      <ProtectedRoute>
+        <DashboardLayout>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-2 text-muted-foreground">Cargando inventario...</p>
+            </div>
           </div>
-        </div>
-      </DashboardLayout>
+        </DashboardLayout>
+      </ProtectedRoute>
     )
   }
 
-  const lowStockCount = inventario.filter((item) => item.stock <= item.stockMinimo).length
+  const lowStockCount = inventario.filter((item) => item.stock > 0 && item.stock <= item.stockMinimo).length
   const outOfStockCount = inventario.filter((item) => item.stock === 0).length
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-balance">Gestión de Inventario</h2>
-            <p className="text-muted-foreground">Administra el stock de tus productos</p>
+    <ProtectedRoute>
+      <DashboardLayout>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-balance">Gestión de Inventario</h2>
+              <p className="text-muted-foreground">Administra el stock de tus productos</p>
+            </div>
+            <div className="flex gap-2">
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Agregar al Inventario
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Agregar Producto al Inventario</DialogTitle>
+                    <DialogDescription>Agrega un nuevo producto al inventario de la sucursal.</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit}>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="sucursal">Sucursal</Label>
+                        <Select
+                          value={formData.idSucursal}
+                          onValueChange={(value) => setFormData({ ...formData, idSucursal: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar sucursal" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {sucursales.map((sucursal) => (
+                              <SelectItem key={sucursal.idSucursal} value={sucursal.idSucursal.toString()}>
+                                {sucursal.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="producto">Producto</Label>
+                        <Select
+                          value={formData.idProducto}
+                          onValueChange={(value) => setFormData({ ...formData, idProducto: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar producto" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {productos.map((producto) => (
+                              <SelectItem key={producto.idProducto} value={producto.idProducto.toString()}>
+                                {producto.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="stock">Stock Inicial</Label>
+                        <Input
+                          id="stock"
+                          type="number"
+                          value={formData.stock}
+                          onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                          placeholder="Cantidad en stock"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="stockMinimo">Stock Mínimo</Label>
+                        <Input
+                          id="stockMinimo"
+                          type="number"
+                          value={formData.stockMinimo}
+                          onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
+                          placeholder="Stock mínimo requerido"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Procesando...
+                          </>
+                        ) : (
+                          "Agregar"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              <Link href="/inventario/movimientos">
+                <Button variant="outline">
+                  <History className="h-4 w-4 mr-2" />
+                  Ver Historial
+                </Button>
+              </Link>
+            </div>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar al Inventario
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Agregar Producto al Inventario</DialogTitle>
-                <DialogDescription>Agrega un nuevo producto al inventario de la sucursal.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="sucursal">Sucursal</Label>
-                    <Select
-                      value={formData.idSucursal}
-                      onValueChange={(value) => setFormData({ ...formData, idSucursal: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar sucursal" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sucursales.map((sucursal) => (
-                          <SelectItem key={sucursal.idSucursal} value={sucursal.idSucursal.toString()}>
-                            {sucursal.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="producto">Producto</Label>
-                    <Select
-                      value={formData.idProducto}
-                      onValueChange={(value) => setFormData({ ...formData, idProducto: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar producto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {productos.map((producto) => (
-                          <SelectItem key={producto.idProducto} value={producto.idProducto.toString()}>
-                            {producto.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="stock">Stock Inicial</Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      value={formData.stock}
-                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                      placeholder="Cantidad en stock"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="stockMinimo">Stock Mínimo</Label>
-                    <Input
-                      id="stockMinimo"
-                      type="number"
-                      value={formData.stockMinimo}
-                      onChange={(e) => setFormData({ ...formData, stockMinimo: e.target.value })}
-                      placeholder="Stock mínimo requerido"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Procesando...
-                      </>
-                    ) : (
-                      "Agregar"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">
@@ -451,6 +516,7 @@ export default function InventarioPage() {
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="normal">En stock</SelectItem>
                   <SelectItem value="low">Stock bajo</SelectItem>
+                  <SelectItem value="out">Sin stock</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -615,7 +681,8 @@ export default function InventarioPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </ProtectedRoute>
   )
 }

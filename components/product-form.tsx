@@ -10,45 +10,51 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Swal from "sweetalert2"
+import { productosService } from "@/lib/services/productos"
+import { Categoria, ProductoCreate, ProductoUpdate, Producto } from "@/lib/models"
 
 interface ProductFormData {
   nombre: string
   descripcion: string
   precio: string
   idCategoria: string
+  imagen?: string
 }
 
 interface ProductFormProps {
   product?: any
   onClose: () => void
+  onProductCreated?: (product: Producto) => void
+  onProductUpdated?: (product: Producto) => void
 }
 
-export function ProductForm({ product, onClose }: ProductFormProps) {
+export function ProductForm({ product, onClose, onProductCreated, onProductUpdated }: ProductFormProps) {
   const [formData, setFormData] = useState<ProductFormData>({
     nombre: "",
     descripcion: "",
     precio: "",
     idCategoria: "",
+    imagen: "",
   })
 
-  const [categories, setCategories] = useState<{ idCategoria: number; nombre: string }[]>([])
+  const [categories, setCategories] = useState<Categoria[]>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [categoriesError, setCategoriesError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   useEffect(() => {
-    // Cargar categorías desde el backend
+    // Cargar categorías usando el servicio
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true)
         setCategoriesError(null)
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/productos/categorias/`)
+        const response = await productosService.getCategorias()
         
-        if (response.ok) {
-          const data = await response.json()
-          setCategories(data)
+        if (response.success && response.data) {
+          setCategories(response.data)
         } else {
-          setCategoriesError("Error al cargar categorías")
-          console.error("Error en respuesta:", response.status)
+          setCategoriesError(response.message || "Error al cargar categorías")
         }
       } catch (error) {
         setCategoriesError("Error de conexión al cargar categorías")
@@ -68,7 +74,11 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
         descripcion: product.descripcion || "",
         precio: product.precio?.toString() || "",
         idCategoria: product.idCategoria?.toString() || "",
+        imagen: product.imagen || "",
       })
+      if (product.imagen) {
+        setImagePreview(product.imagen)
+      }
     }
   }, [product])
 
@@ -76,33 +86,42 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string
+        setFormData((prev) => ({ ...prev, imagen: base64 }))
+        setImagePreview(base64)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
     
     try {
-      const productData = {
+      const productData: ProductoCreate | ProductoUpdate = {
         nombre: formData.nombre,
         descripcion: formData.descripcion,
         precio: Number.parseFloat(formData.precio),
         idCategoria: Number.parseInt(formData.idCategoria),
+        ...(formData.imagen && { imagen: formData.imagen })
       }
 
-      const url = product
-        ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/productos/${product.id}/`
-        : `${process.env.NEXT_PUBLIC_API_BASE_URL}/productos/`
-      
-      const method = product ? "PUT" : "POST"
+      let response
+      if (product) {
+        // Actualizar producto existente
+        response = await productosService.updateProducto(product.idProducto, productData as ProductoUpdate)
+      } else {
+        // Crear nuevo producto
+        response = await productosService.createProducto(productData as ProductoCreate)
+      }
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(productData),
-      })
-
-      if (response.ok) {
-        // Mostrar alerta de éxito
+      if (response.success) {
         await Swal.fire({
           title: "¡Éxito!",
           text: product ? "Producto actualizado correctamente" : "Producto creado correctamente",
@@ -110,28 +129,32 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
           confirmButtonText: "Aceptar"
         })
         
+        // Llamar a los callbacks si existen
+        if (product && onProductUpdated && response.data) {
+          onProductUpdated(response.data)
+        } else if (!product && onProductCreated && response.data) {
+          onProductCreated(response.data)
+        }
+        
         onClose()
-        // Recargar la página o actualizar la lista de productos
-        window.location.reload()
       } else {
-        console.error("Error al guardar el producto")
-        // Mostrar alerta de error
         await Swal.fire({
           title: "Error",
-          text: "Ha ocurrido un error al guardar el producto",
+          text: response.message || "Ha ocurrido un error al guardar el producto",
           icon: "error",
           confirmButtonText: "Aceptar"
         })
       }
     } catch (error) {
       console.error("Error:", error)
-      // Mostrar alerta de error
       await Swal.fire({
         title: "Error",
         text: "Ha ocurrido un error inesperado",
         icon: "error",
         confirmButtonText: "Aceptar"
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -162,6 +185,43 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
               placeholder="Descripción detallada del producto"
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="imagen">Imagen del Producto</Label>
+            <div className="space-y-4">
+              {imagePreview && (
+                <div className="flex flex-col items-center">
+                  <img
+                    src={imagePreview}
+                    alt="Vista previa"
+                    className="w-32 h-32 object-cover rounded-lg border"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => {
+                      setImagePreview(null)
+                      setFormData(prev => ({ ...prev, imagen: "" }))
+                    }}
+                  >
+                    Eliminar imagen
+                  </Button>
+                </div>
+              )}
+              <Input
+                id="imagen"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="cursor-pointer"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 5MB
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -217,10 +277,19 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
       </Card>
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onClose}>
+        <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
           Cancelar
         </Button>
-        <Button type="submit">{product ? "Actualizar" : "Crear"} Producto</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              {product ? "Actualizando..." : "Creando..."}
+            </>
+          ) : (
+            product ? "Actualizar Producto" : "Crear Producto"
+          )}
+        </Button>
       </div>
     </form>
   )

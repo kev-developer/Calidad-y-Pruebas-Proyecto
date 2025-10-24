@@ -1,9 +1,15 @@
 "use client"
+
 import React, { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { productosService } from "@/lib/services/productos"
+import { authService } from "@/lib/services/auth"
+import { Search, User, Home, Package, LogOut, Star, TrendingUp } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 type Product = {
   id: number
@@ -14,23 +20,17 @@ type Product = {
   blurDataURL?: string
   author?: string
   brand?: string
+  rating?: number
+  stock?: number
 }
 
-export default function HomePage() {
+export default function CatalogoPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [showLoginModal, setShowLoginModal] = useState(false)
-  const [loginForm, setLoginForm] = useState({
-    email: "",
-    password: ""
-  })
-  const [signupForm, setSignupForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: ""
-  })
-  const [isLogin, setIsLogin] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const router = useRouter()
 
   useEffect(() => {
     let mounted = true
@@ -45,8 +45,10 @@ export default function HomePage() {
             name: producto.nombre,
             category: `Categoría ${producto.idCategoria}`,
             price: producto.precio,
-            imageUrl: "/placeholder.jpg", // Placeholder hasta que se añadan imágenes
-            author: producto.descripcion || "Sin descripción"
+            imageUrl: producto.imagen || "/placeholder.jpg",
+            author: producto.descripcion || "Sin descripción",
+            rating: 4.5 + Math.random() * 0.5, // Rating aleatorio entre 4.5 y 5.0
+            stock: producto.stock || Math.floor(Math.random() * 50) + 10
           }))
           if (mounted) setProducts(mappedProducts)
         } else {
@@ -66,344 +68,375 @@ export default function HomePage() {
     }
   }, [])
 
-  const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setLoginForm(prev => ({
-      ...prev,
-      [name]: value
-    }))
+  useEffect(() => {
+    const checkAuth = async () => {
+      const authenticated = authService.isAuthenticated()
+      setIsAuthenticated(authenticated)
+      if (authenticated) {
+        let storedUser = authService.getStoredUser()
+        // Si no hay usuario almacenado, intentar obtenerlo del servidor
+        if (!storedUser) {
+          try {
+            const userResult = await authService.getCurrentUser()
+            if (userResult.success && userResult.data) {
+              storedUser = userResult.data
+              setUser(storedUser)
+            }
+          } catch (error) {
+            console.error('Error obteniendo usuario:', error)
+          }
+        } else {
+          setUser(storedUser)
+        }
+      } else {
+        setUser(null)
+      }
+    }
+
+    // Verificar al montar
+    checkAuth()
+
+    // Escuchar cambios en el localStorage (para otras pestañas)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token' || e.key === 'user') {
+        checkAuth()
+      }
+    }
+
+    // Escuchar cuando la pestaña recibe foco
+    const handleFocus = () => {
+      checkAuth()
+    }
+
+    // Escuchar evento personalizado de cambio de autenticación
+    const handleAuthStateChange = () => {
+      checkAuth()
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('authStateChange', handleAuthStateChange)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('authStateChange', handleAuthStateChange)
+    }
+  }, [])
+
+  const handleLogout = () => {
+    authService.logout()
+    router.push('/catalogo')
   }
 
-  const handleSignupChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setSignupForm(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
+  // Obtener solo los 4 productos más recientes
+  const recentProducts = products.slice(0, 4)
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Aquí normalmente se conectaría con el backend
-    console.log("Datos de inicio de sesión:", loginForm)
-    alert("En una implementación real, esto conectaría con el backend. Datos: " + JSON.stringify(loginForm))
-    setShowLoginModal(false)
-  }
-
-  const handleSignupSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Aquí normalmente se conectaría con el backend
-    console.log("Datos de registro:", signupForm)
-    alert("En una implementación real, esto conectaría con el backend. Datos: " + JSON.stringify(signupForm))
-    setShowLoginModal(false)
-  }
-
-  if (loading) return <div className="p-6 text-center">Cargando...</div>
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#fcfdfd]">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#415444] mx-auto mb-4"></div>
+        <p className="text-gray-600">Cargando productos...</p>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      {/* Header */}
-      <header className="bg-blue-700 text-white py-4 shadow-md">
-        <div className="container mx-auto flex justify-between items-center px-4">
-          <h1 className="text-2xl font-bold flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-            </svg>
-            Papelería Pro
-          </h1>
-          <Button 
-            onClick={() => setShowLoginModal(true)}
-            className="bg-white text-blue-700 hover:bg-gray-100 font-medium"
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#fcfdfd]">
+      {/* Mobile Header */}
+      <header className="lg:hidden flex items-center justify-between p-4 bg-white border-b">
+        <button
+          className="flex items-center gap-2"
+          onClick={() => {
+            const sidebar = document.querySelector('aside');
+            if (sidebar) {
+              sidebar.classList.toggle('hidden');
+            }
+          }}
+        >
+          <Package className="h-6 w-6 text-[#415444]" />
+          <h1 className="text-lg font-bold text-[#415444]">Papelería Pro</h1>
+        </button>
+        {isAuthenticated ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+            onClick={handleLogout}
           >
-            Iniciar Sesión
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">Cerrar Sesión</span>
           </Button>
-        </div>
+        ) : (
+          <Link href="/auth/login">
+            <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">Iniciar Sesión</span>
+            </Button>
+          </Link>
+        )}
       </header>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl font-bold mb-4">Todo en material de oficina y escolar</h2>
-          <p className="text-xl mb-8 max-w-2xl mx-auto">
-            En Papelería Pro encontrarás los mejores productos para tu oficina, escuela o proyectos creativos
-          </p>
+      {/* Sidebar */}
+      <aside className="hidden lg:block lg:static fixed inset-0 z-50 bg-white w-64 border-r px-6 py-8">
+        {/* Mobile Close Button */}
+        <div className="lg:hidden flex justify-between items-center mb-8">
+          <div className="flex items-center gap-2">
+            <Package className="h-8 w-8 text-[#415444]" />
+            <h1 className="text-xl font-bold text-[#415444]">Papelería Pro</h1>
+          </div>
+          <button
+            className="lg:hidden p-2"
+            onClick={() => {
+              const sidebar = document.querySelector('aside');
+              if (sidebar) {
+                sidebar.classList.add('hidden');
+              }
+            }}
+          >
+            <svg className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-      </section>
-
-      {/* About Section */}
-      <section className="py-12 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">¿Quiénes Somos?</h2>
-          <div className="grid md:grid-cols-2 gap-8 items-center">
-            <div>
-              <p className="text-lg mb-4">
-                Papelería Pro es una empresa con más de 15 años de experiencia en el sector de suministros de oficina y material escolar.
-              </p>
-              <p className="text-lg mb-4">
-                Nos enorgullece ofrecer productos de alta calidad a precios competitivos, con un servicio al cliente excepcional y entrega rápida.
-              </p>
-              <p className="text-lg">
-                Trabajamos con las mejores marcas del mercado para garantizar la satisfacción total de nuestros clientes.
-              </p>
-            </div>
-            <div className="flex justify-center">
-              <div className="w-full h-64 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-4 0H9m4 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v12m4 0V9m0 12h4m-4 0v-6m4 6v-6h2m-8 6V9h2m0 12v-6m0 6h4" />
-                </svg>
-              </div>
-            </div>
+        <div className="mb-8">
+          <div className="flex items-center gap-2">
+            <Package className="h-8 w-8 text-[#415444]" />
+            <h1 className="text-xl font-bold text-[#415444]">Papelería Pro</h1>
           </div>
         </div>
-      </section>
-
-      {/* Featured Products */}
-      <section className="py-12">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">Productos</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {products.map((p) => (
-              <div key={p.id} className="bg-white p-4 rounded-lg shadow-md border border-gray-200 flex flex-col transition-transform hover:scale-105">
-                <div className="relative w-full h-40 mb-3 bg-gray-200 rounded-lg flex items-center justify-center">
-                  {p.imageUrl ? (
-                    <Image
-                      src={p.imageUrl}
-                      alt={p.name}
-                      fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                      style={{ objectFit: "cover", borderRadius: 8 }}
-                      placeholder={p.blurDataURL ? "blur" : "empty"}
-                      blurDataURL={p.blurDataURL}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  )}
-                </div>
-                <h3 className="text-lg font-semibold text-gray-800">{p.name}</h3>
-                <p className="text-sm text-gray-600 mb-2">{p.category}</p>
-                {(p.author || p.brand) && (
-                  <p className="text-sm text-gray-600">
-                    Marca/Autor: {p.author || p.brand}
+        <nav className="space-y-4">
+          <Link
+            href="/catalogo"
+            className="flex items-center gap-3 rounded-lg bg-[#e0e5ce] px-3 py-2 text-[#415444] transition-colors"
+          >
+            <Home className="h-5 w-5" />
+            Inicio
+          </Link>
+          <Link
+            href="/catalogo/completo"
+            className="flex items-center gap-3 px-3 py-2 text-gray-500 transition-colors hover:text-gray-900"
+          >
+            <Package className="h-5 w-5" />
+            Catálogo Completo
+          </Link>
+          {isAuthenticated ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 px-3 py-2 text-gray-500">
+                <User className="h-5 w-5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{user?.nombre || 'Usuario'}</p>
+                  <p className="text-xs text-gray-400">
+                    {user?.idRol === 2 ? 'Cliente' : user?.idRol === 1 ? 'Administrador' : 'Usuario'}
                   </p>
-                )}
-                <p className="mt-2 font-bold text-blue-700">${p.price}</p>
-                <span className="mt-2 inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-                  Disponible
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Contact Section */}
-      <section className="py-12 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">Contacto</h2>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="text-xl font-semibold mb-4">Información de Contacto</h3>
-              <div className="space-y-4">
-                <div className="flex items-start">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  <span>info@papeleriapro.com</span>
-                </div>
-                <div className="flex items-start">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  <span>+51 999 868 777</span>
-                </div>
-                <div className="flex items-start">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span>Av. Principal 123, Lima, Perú</span>
                 </div>
               </div>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold mb-4">Horario de Atención</h3>
-              <div className="space-y-2">
-                <p>Lunes a Viernes: 9:00 AM - 7:00 PM</p>
-                <p>Sábados: 9:00 AM - 5:00 PM</p>
-                <p>Domingos: 10:00 AM - 2:00 PM</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-800 text-white py-8">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="text-xl font-bold mb-4">Papelería Pro</h3>
-              <p>Tu tienda de confianza para todos tus suministros de oficina, escuela y materiales de arte.</p>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold mb-4">Enlaces Rápidos</h3>
-              <ul className="space-y-2">
-                <li><Button variant="link" className="text-white hover:text-blue-300 p-0 h-auto" onClick={() => setShowLoginModal(true)}>Iniciar Sesión</Button></li>
-                <li><Button variant="link" className="text-white hover:text-blue-300 p-0 h-auto" onClick={() => {setIsLogin(false); setShowLoginModal(true);}}>Crear Cuenta</Button></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold mb-4">Síguenos</h3>
-              <div className="flex space-x-4">
-                <a href="#" className="hover:text-blue-300">
-                  <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                </a>
-                <a href="#" className="hover:text-blue-300">
-                  <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12c0 5.523 4.477 10 10 10s10-4.477 10-10c0-5.523-4.477-10-10-10zm5.63 7.026a3.728 3.728 0 0 1-1.052 2.583c.007.087.01.175.01.263 0 2.7-2.055 5.812-5.814 5.812a5.785 5.785 0 0 1-3.138-.917c.162.019.326.029.492.029.966 0 1.855-.329 2.56-.88a2.045 2.045 0 0 1-1.91-1.418c.126.024.255.037.388.037.188 0 .371-.025.545-.073a2.043 2.043 0 0 1-1.64-2.003v-.025c.276.153.593.245.928.256a2.04 2.04 0 0 1-.91-1.705c0-.376.101-.728.277-1.031a5.794 5.794 0 0 0 4.209 2.135 2.041 2.041 0 0 1 3.478-1.86 4.09 4.09 0 0 0 1.295-.493 2.046 2.046 0 0 1-.898 1.128 4.102 4.102 0 0 0 1.174-.321 4.385 4.385 0 0 1-1.024 1.057z"/></svg>
-                </a>
-                <a href="#" className="hover:text-blue-300">
-                  <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c5.51 0 10-4.48 10-10S17.51 2 12 2zm6.605 4.61a8.502 8.502 0 011.93 5.314c-.281-.054-3.101-.629-5.943-.271-.065-.141-.12-.293-.184-.445a25.416 25.416 0 00-.564-1.236c3.145-1.28 4.577-3.124 4.761-3.362zM12 3.475c2.17 0 4.154.813 5.662 2.148-.152.216-1.443 1.941-4.48 3.08-1.399-2.57-2.95-4.675-3.189-5A8.687 8.687 0 0112 3.475zm-3.633.803a53.896 53.896 0 013.167 4.935c-3.992 1.063-7.517 1.04-7.896 1.04a8.581 8.581 0 014.729-5.975zM3.453 12.01v-.26c.37.01 4.512.065 8.775-1.215.25.477.477.965.694 1.453-.109.033-.228.065-.336.098-4.404 1.42-6.747 5.303-6.942 5.629a8.522 8.522 0 01-2.19-5.705zM12 20.547a8.482 8.482 0 01-5.239-1.8c.152-.315 1.888-3.656 6.703-5.337.022-.01.033-.01.054-.022a35.318 35.318 0 011.823 6.475 8.4 8.4 0 01-3.341.684zm4.761-1.465c-.086-.52-.542-3.015-1.659-6.084 2.679-.423 5.022.271 5.314.369a8.468 8.468 0 01-3.655 5.715z"/></svg>
-                </a>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-gray-700 mt-8 pt-6 text-center">
-            <p>&copy; 2023 Papelería Pro. Todos los derechos reservados.</p>
-          </div>
-        </div>
-      </footer>
-
-      {/* Login/Signup Modal */}
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center border-b px-6 py-4">
-              <h3 className="text-xl font-bold text-gray-800">
-                {isLogin ? "Iniciar Sesión" : "Crear Cuenta"}
-              </h3>
-              <button 
-                onClick={() => setShowLoginModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                size="sm"
+                className="w-full flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+                <LogOut className="h-4 w-4" />
+                Cerrar Sesión
+              </Button>
             </div>
-            
-            <div className="px-6 py-4">
-              {isLogin ? (
-                <form onSubmit={handleLoginSubmit}>
-                  <div className="mb-4">
-                    <label htmlFor="email" className="block text-gray-700 mb-2">Correo Electrónico</label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={loginForm.email}
-                      onChange={handleLoginChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                  <div className="mb-6">
-                    <label htmlFor="password" className="block text-gray-700 mb-2">Contraseña</label>
-                    <input
-                      type="password"
-                      id="password"
-                      name="password"
-                      value={loginForm.password}
-                      onChange={handleLoginChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 mb-4">
-                    Iniciar Sesión
-                  </Button>
-                  <p className="text-center text-sm text-gray-600">
-                    ¿No tienes cuenta?{" "}
-                    <button 
-                      type="button" 
-                      className="text-blue-600 hover:underline"
-                      onClick={() => setIsLogin(false)}
-                    >
-                      Regístrate aquí
-                    </button>
-                  </p>
-                </form>
-              ) : (
-                <form onSubmit={handleSignupSubmit}>
-                  <div className="mb-4">
-                    <label htmlFor="name" className="block text-gray-700 mb-2">Nombre Completo</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={signupForm.name}
-                      onChange={handleSignupChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                  <div className="mb-4">
-                    <label htmlFor="signup-email" className="block text-gray-700 mb-2">Correo Electrónico</label>
-                    <input
-                      type="email"
-                      id="signup-email"
-                      name="email"
-                      value={signupForm.email}
-                      onChange={handleSignupChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                  <div className="mb-4">
-                    <label htmlFor="signup-password" className="block text-gray-700 mb-2">Contraseña</label>
-                    <input
-                      type="password"
-                      id="signup-password"
-                      name="password"
-                      value={signupForm.password}
-                      onChange={handleSignupChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                  <div className="mb-6">
-                    <label htmlFor="confirm-password" className="block text-gray-700 mb-2">Confirmar Contraseña</label>
-                    <input
-                      type="password"
-                      id="confirm-password"
-                      name="confirmPassword"
-                      value={signupForm.confirmPassword}
-                      onChange={handleSignupChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 mb-4">
-                    Crear Cuenta
-                  </Button>
-                  <p className="text-center text-sm text-gray-600">
-                    ¿Ya tienes cuenta?{" "}
-                    <button 
-                      type="button" 
-                      className="text-blue-600 hover:underline"
-                      onClick={() => setIsLogin(true)}
-                    >
-                      Inicia sesión aquí
-                    </button>
-                  </p>
-                </form>
-              )}
-            </div>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="flex items-center gap-3 px-3 py-2 text-gray-500 transition-colors hover:text-gray-900"
+            >
+              <User className="h-5 w-5" />
+              Iniciar Sesión
+            </Link>
+          )}
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <header className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-semibold">
+              Bienvenido a Papelería Pro <span className="ml-1">👋</span>
+            </h2>
+            <p className="text-sm sm:text-base text-gray-500">Encuentra los mejores productos de papelería</p>
           </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                className="w-full sm:w-64 pl-10"
+                placeholder="Buscar productos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {isAuthenticated ? (
+              <div className="hidden lg:flex items-center gap-4">
+                <span className="text-sm text-gray-600">Hola, {user?.nombre || 'Usuario'}</span>
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Cerrar Sesión
+                </Button>
+              </div>
+            ) : (
+              <Link href="/auth/login" className="hidden lg:block">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Iniciar Sesión
+                </Button>
+              </Link>
+            )}
+          </div>
+        </header>
+
+        {/* Hero Cards */}
+        <div className="mb-8 lg:mb-12 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <Card className="bg-[#e0e5ce] border-0 rounded-[24px]">
+            <CardContent className="p-6">
+              <p className="mb-2 text-sm font-medium uppercase text-[#338838]">OFERTAS ESPECIALES</p>
+              <h3 className="mb-4 text-2xl font-semibold">Colección de Papelería</h3>
+              <p className="mb-6 text-gray-600">Descubre los mejores productos para tu oficina, escuela o proyectos creativos</p>
+              <Link href="/catalogo/completo">
+                <Button className="bg-[#415444] hover:bg-[#415444]/90">Ver Catálogo</Button>
+              </Link>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-[#e7ddd1] to-[#d4c9b8] border-0 rounded-[24px]">
+            <CardContent className="flex items-center justify-between p-6">
+              <div>
+                <h3 className="mb-4 text-3xl font-semibold">Gestiona la Papelería</h3>
+                <p className="mb-6 text-5xl font-bold">Admin</p>
+                <Link href="https://papeleriaaa.netlify.app/">
+                  <Button className="bg-[#415444] hover:bg-[#415444]/90">Acceder al Sistema</Button>
+                </Link>
+              </div>
+              <div className="w-32 h-32 bg-[#415444] rounded-full flex items-center justify-center shadow-lg">
+                <TrendingUp className="h-16 w-16 text-white" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      )}
+
+        {/* Recent Products Section */}
+        <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-xl sm:text-2xl font-semibold">Productos Recientes</h3>
+            <span className="bg-[#e0e5ce] text-[#415444] px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
+              Nuevo
+            </span>
+          </div>
+          <Link href="/catalogo/completo">
+            <Button className="bg-[#415444] hover:bg-[#415444]/90 text-white rounded-full px-4 sm:px-6 text-sm sm:text-base">
+              Ver Todo el Catálogo
+            </Button>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 lg:mb-12">
+          {recentProducts.map((product) => (
+            <Card
+              key={product.id}
+              className="group border-0 bg-white rounded-[20px] overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-2 border border-gray-100"
+            >
+              <Link href={`/catalogo/producto/${product.id}`}>
+                <CardHeader className="p-0 relative cursor-pointer">
+                  <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity group-hover:opacity-100 z-10 rounded-t-[20px]" />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 opacity-0 transform scale-95 transition-all group-hover:opacity-100 group-hover:scale-100">
+                    <Button className="bg-white text-black hover:bg-white/90 shadow-lg rounded-full">
+                      Ver Detalles
+                    </Button>
+                  </div>
+                  <div className="relative w-full h-48 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
+                    {product.imageUrl ? (
+                      <Image
+                        src={product.imageUrl}
+                        alt={product.name}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        style={{ objectFit: "cover" }}
+                        className="transition-transform duration-500 group-hover:scale-110"
+                      />
+                    ) : (
+                      <Package className="h-16 w-16 text-gray-400" />
+                    )}
+                  </div>
+                </CardHeader>
+              </Link>
+              <CardContent className="p-5 space-y-4">
+                <Link href={`/catalogo/producto/${product.id}`} className="cursor-pointer">
+                  <div>
+                    <h4 className="text-lg font-semibold mb-2 line-clamp-1 hover:text-[#415444] transition-colors">{product.name}</h4>
+                    <p className="text-sm text-gray-600 mb-2">{product.category}</p>
+                    
+                    {/* Rating */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`h-3 w-3 ${
+                              i < Math.floor(product.rating || 4.5)
+                                ? "text-yellow-400 fill-yellow-400"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-gray-500">({(product.rating || 4.5).toFixed(1)})</span>
+                    </div>
+
+                    {product.author && (
+                      <p className="text-xs text-gray-500 line-clamp-2">{product.author}</p>
+                    )}
+                  </div>
+                </Link>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[#338838] text-xl font-bold">$ {product.price}</p>
+                    <p className="text-xs text-gray-500">En stock: {product.stock}</p>
+                  </div>
+                  <Link href={`/catalogo/producto/${product.id}`}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full hover:bg-[#415444] hover:text-white transition-colors border-2"
+                    >
+                      Ver Detalles
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Call to Action */}
+        <Card className="bg-gradient-to-r from-[#415444] to-[#338838] border-0 rounded-2xl lg:rounded-[24px] text-white overflow-hidden">
+          <CardContent className="p-6 lg:p-8 text-center relative">
+            <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-white/10 rounded-full -translate-y-12 lg:-translate-y-16 translate-x-12 lg:translate-x-16"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 lg:w-24 lg:h-24 bg-white/10 rounded-full translate-y-8 lg:translate-y-12 -translate-x-8 lg:-translate-x-12"></div>
+            
+            <div className="relative z-10">
+              <h3 className="text-xl lg:text-2xl font-semibold mb-4">¿No encuentras lo que buscas?</h3>
+              <p className="mb-6 text-white/90 max-w-2xl mx-auto text-sm lg:text-lg">
+                Explora nuestro catálogo completo con cientos de productos de papelería,
+                materiales de oficina y suministros escolares.
+              </p>
+              <Link href="/catalogo/completo">
+                <Button className="bg-white text-[#415444] hover:bg-white/90 text-sm lg:text-base font-semibold px-6 lg:px-8 py-2 lg:py-3 rounded-full shadow-lg">
+                  Ver Catálogo Completo
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
     </div>
   )
 }

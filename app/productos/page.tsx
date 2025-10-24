@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/ui/dashboard-layout"
+import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -134,12 +135,16 @@ export default function ProductsPage() {
 
   const handleProductCreated = (newProduct: Producto) => {
     setProducts(prev => [...prev, newProduct])
+    setIsProductFormOpen(false)
+    setEditingProduct(null)
   }
 
   const handleProductUpdated = (updatedProduct: Producto) => {
     setProducts(prev => prev.map(p =>
       p.idProducto === updatedProduct.idProducto ? updatedProduct : p
     ))
+    setIsProductFormOpen(false)
+    setEditingProduct(null)
   }
 
   const getStockStatus = () => {
@@ -149,35 +154,40 @@ export default function ProductsPage() {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Cargando productos...</p>
+      <ProtectedRoute>
+        <DashboardLayout>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-2 text-muted-foreground">Cargando productos...</p>
+            </div>
           </div>
-        </div>
-      </DashboardLayout>
+        </DashboardLayout>
+      </ProtectedRoute>
     )
   }
 
   if (error) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-foreground mb-2">Error al cargar productos</h2>
-            <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()}>Reintentar</Button>
+      <ProtectedRoute>
+        <DashboardLayout>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-foreground mb-2">Error al cargar productos</h2>
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button onClick={() => window.location.reload()}>Reintentar</Button>
+            </div>
           </div>
-        </div>
-      </DashboardLayout>
+        </DashboardLayout>
+      </ProtectedRoute>
     )
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <ProtectedRoute>
+      <DashboardLayout>
+        <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-3xl font-serif font-bold text-foreground">Gestión de Productos</h2>
@@ -200,7 +210,12 @@ export default function ProductsPage() {
                   </DialogContent>
                 </Dialog>
 
-                <Dialog open={isProductFormOpen} onOpenChange={setIsProductFormOpen}>
+                <Dialog open={isProductFormOpen} onOpenChange={(open) => {
+                  setIsProductFormOpen(open)
+                  if (!open) {
+                    setEditingProduct(null)
+                  }
+                }}>
                   <DialogTrigger asChild>
                     <Button>
                       <Plus className="h-4 w-4 mr-2" />
@@ -220,6 +235,8 @@ export default function ProductsPage() {
                         setIsProductFormOpen(false)
                         setEditingProduct(null)
                       }}
+                      onProductCreated={handleProductCreated}
+                      onProductUpdated={handleProductUpdated}
                     />
                   </DialogContent>
                 </Dialog>
@@ -356,7 +373,8 @@ export default function ProductsPage() {
                 </Table>
               </CardContent>
             </Card>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </ProtectedRoute>
   )
 }

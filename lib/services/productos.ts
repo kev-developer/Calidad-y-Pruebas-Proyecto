@@ -1,4 +1,5 @@
 import { ApiResponse, Producto, Categoria, ProductoCreate, ProductoUpdate } from '@/lib/models';
+import { fetchWithAuth } from './auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -6,7 +7,7 @@ export const productosService = {
     // Listar todos los productos
     async getProductos(): Promise<ApiResponse<Producto[]>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/`);
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/`);
             const data = await response.json();
 
             // Si la respuesta es un array, asumimos que es exitosa
@@ -24,9 +25,8 @@ export const productosService = {
     // Obtener producto por ID
     async getProducto(id: number): Promise<ApiResponse<Producto>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/${id}`);
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/${id}`);
             const data = await response.json();
-
 
             // Si la respuesta es un objeto con propiedades de producto, asumimos que es exitosa
             if (data && typeof data === 'object' && data.hasOwnProperty('idProducto')) {
@@ -47,11 +47,8 @@ export const productosService = {
     // Crear nuevo producto
     async createProducto(productoData: ProductoCreate): Promise<ApiResponse<Producto>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(productoData),
             });
             const data = await response.json();
@@ -70,11 +67,8 @@ export const productosService = {
     // Actualizar producto
     async updateProducto(id: number, productoData: ProductoUpdate): Promise<ApiResponse<Producto>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/${id}`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(productoData),
             });
             const data = await response.json();
@@ -93,7 +87,7 @@ export const productosService = {
     // Eliminar producto
     async deleteProducto(id: number): Promise<ApiResponse<void>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/${id}`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/${id}`, {
                 method: 'DELETE',
             });
             // Para DELETE, el backend podría no retornar contenido
@@ -115,7 +109,7 @@ export const productosService = {
     // Listar todas las categorías
     async getCategorias(): Promise<ApiResponse<Categoria[]>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/categorias/`);
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/categorias/`);
             const data = await response.json();
             // Si la respuesta es un array, asumimos que es exitosa
             if (Array.isArray(data)) {
@@ -132,7 +126,7 @@ export const productosService = {
     // Obtener categoría por ID
     async getCategoria(id: number): Promise<ApiResponse<Categoria>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/categorias/${id}`);
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/categorias/${id}`);
             return await response.json();
         } catch (error) {
             console.error('Error fetching categoria:', error);
@@ -143,11 +137,8 @@ export const productosService = {
     // Crear nueva categoría
     async createCategoria(categoriaData: Omit<Categoria, 'idCategoria'>): Promise<ApiResponse<Categoria>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/categorias/`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/categorias/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(categoriaData),
             });
             const data = await response.json();
@@ -166,11 +157,8 @@ export const productosService = {
     // Actualizar categoría
     async updateCategoria(id: number, categoriaData: Partial<Categoria>): Promise<ApiResponse<Categoria>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/categorias/${id}`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/categorias/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(categoriaData),
             });
             const data = await response.json();
@@ -189,7 +177,7 @@ export const productosService = {
     // Eliminar categoría
     async deleteCategoria(id: number): Promise<ApiResponse<void>> {
         try {
-            const response = await fetch(`${API_BASE_URL}/productos/categorias/${id}`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/productos/categorias/${id}`, {
                 method: 'DELETE',
             });
             // Para DELETE, el backend podría no retornar contenido

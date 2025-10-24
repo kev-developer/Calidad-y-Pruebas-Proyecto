@@ -10,6 +10,7 @@ export interface Usuario {
   email: string
   contraseña: string
   idRol: number | null
+  foto_perfil?: string | null
 }
 
 // Client Models
@@ -76,6 +77,7 @@ export interface Producto {
   precio: number
   idCategoria: number | null
   categoria?: Categoria
+  imagen?: string
 }
 
 export interface ProductoCreate {
@@ -83,6 +85,7 @@ export interface ProductoCreate {
   descripcion?: string
   precio: number
   idCategoria?: number
+  imagen?: string
 }
 
 export interface ProductoUpdate {
@@ -90,6 +93,7 @@ export interface ProductoUpdate {
   descripcion?: string
   precio?: number
   idCategoria?: number
+  imagen?: string
 }
 
 // Inventory Models
