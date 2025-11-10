@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Montserrat } from "next/font/google"
 import { Open_Sans } from "next/font/google"
+import Script from "next/script"
 import "./globals.css"
 
 const montserrat = Montserrat({
@@ -31,6 +32,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${montserrat.variable} ${openSans.variable} antialiased`}>
+      <head>
+        <Script
+          src="https://cdn.userway.org/widget.js"
+          data-account="ZxtWFmmL7x"
+          data-position="3"
+          strategy="afterInteractive"
+        />
+      </head>
       <body className="font-sans">{children}</body>
     </html>
   )
